@@ -1,10 +1,12 @@
 ﻿using FreeSql.Internal.ObjectPool;
 using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
+#if MicrosoftData
+using Microsoft.Data.Sqlite;
+#else
 using System.Data.SQLite;
+#endif
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -34,28 +36,44 @@ namespace FreeSql.Sqlite
 
         public void Return(Object<DbConnection> obj, Exception exception, bool isRecreate = false)
         {
+#if MicrosoftData
+            if (exception != null && exception is SqliteException)
+#else
             if (exception != null && exception is SQLiteException)
+#endif
             {
-                try { if (obj.Value.Ping() == false) obj.Value.OpenAndAttach(policy.Attaches); } catch { base.SetUnavailable(exception); }
+                if (obj.Value.Ping() == false)
+                    base.SetUnavailable(exception, obj.LastGetTimeCopy);
             }
             base.Return(obj, isRecreate);
         }
 
         internal SqliteConnectionPoolPolicy policy;
+
+        public static DbConnection CreateConnection(string connectionString)
+        {
+#if MicrosoftData
+            var conn = new SqliteConnection(connectionString);
+#else
+            var conn = new SQLiteConnection(connectionString);
+#endif
+            return conn;
+        }
     }
 
     class SqliteConnectionPoolPolicy : IPolicy<DbConnection>
     {
 
         internal SqliteConnectionPool _pool;
-        public string Name { get; set; } = "Sqlite SQLiteConnection 对象池";
+        public string Name { get; set; } = $"Sqlite SQLiteConnection {CoreStrings.S_ObjectPool}";
         public int PoolSize { get; set; } = 100;
         public TimeSpan SyncGetTimeout { get; set; } = TimeSpan.FromSeconds(10);
         public TimeSpan IdleTimeout { get; set; } = TimeSpan.Zero;
         public int AsyncGetCapacity { get; set; } = 10000;
         public bool IsThrowGetTimeoutException { get; set; } = true;
         public bool IsAutoDisposeWithSystem { get; set; } = true;
-        public int CheckAvailableInterval { get; set; } = 5;
+        public int CheckAvailableInterval { get; set; } = 2;
+        public int Weight { get; set; } = 1;
         public string[] Attaches = new string[0];
 
         private string _connectionString;
@@ -66,8 +84,17 @@ namespace FreeSql.Sqlite
             {
                 _connectionString = value ?? "";
 
-                var pattern = @"Max\s*pool\s*size\s*=\s*(\d+)";
-                Match m = Regex.Match(_connectionString, pattern, RegexOptions.IgnoreCase);
+                var minPoolSize = 1;
+                var pattern = @"Min\s*pool\s*size\s*=\s*(\d+)";
+                var m = Regex.Match(_connectionString, pattern, RegexOptions.IgnoreCase);
+                if (m.Success)
+                {
+                    minPoolSize = int.Parse(m.Groups[1].Value);
+                    _connectionString = Regex.Replace(_connectionString, pattern, "", RegexOptions.IgnoreCase);
+                }
+
+                pattern = @"Max\s*pool\s*size\s*=\s*(\d+)";
+                m = Regex.Match(_connectionString, pattern, RegexOptions.IgnoreCase);
                 if (m.Success)
                 {
                     PoolSize = int.Parse(m.Groups[1].Value);
@@ -79,15 +106,6 @@ namespace FreeSql.Sqlite
                 if (m.Success)
                 {
                     IdleTimeout = TimeSpan.FromSeconds(int.Parse(m.Groups[1].Value));
-                    _connectionString = Regex.Replace(_connectionString, pattern, "", RegexOptions.IgnoreCase);
-                }
-
-                var minPoolSize = 0;
-                pattern = @"Min\s*pool\s*size\s*=\s*(\d+)";
-                m = Regex.Match(_connectionString, pattern, RegexOptions.IgnoreCase);
-                if (m.Success)
-                {
-                    minPoolSize = int.Parse(m.Groups[1].Value);
                     _connectionString = Regex.Replace(_connectionString, pattern, "", RegexOptions.IgnoreCase);
                 }
 
@@ -122,15 +140,12 @@ namespace FreeSql.Sqlite
 
         public bool OnCheckAvailable(Object<DbConnection> obj)
         {
+            if (obj.Value == null) return false;
             if (obj.Value.State == ConnectionState.Closed) obj.Value.OpenAndAttach(Attaches);
             return obj.Value.Ping(true);
         }
 
-        public DbConnection OnCreate()
-        {
-            var conn = new SQLiteConnection(_connectionString);
-            return conn;
-        }
+        public DbConnection OnCreate() => SqliteConnectionPool.CreateConnection(_connectionString);
 
         public void OnDestroy(DbConnection obj)
         {
@@ -145,9 +160,8 @@ namespace FreeSql.Sqlite
             {
                 if (obj.Value == null)
                 {
-                    if (_pool.SetUnavailable(new Exception("连接字符串错误，或者检查项目属性 > 生成 > 目标平台：x86 | x64")) == true)
-                        throw new Exception($"【{this.Name}】连接字符串错误，请检查。或者检查项目属性 > 生成 > 目标平台：x86 | x64");
-                    return;
+                    _pool.SetUnavailable(new Exception(CoreStrings.S_ConnectionStringError_CheckProject), obj.LastGetTimeCopy);
+                    throw new Exception(CoreStrings.S_ConnectionStringError_CheckProjectConnection(this.Name));
                 }
 
                 if (obj.Value.State != ConnectionState.Open || DateTime.Now.Subtract(obj.LastReturnTime).TotalSeconds > 60 && obj.Value.Ping() == false)
@@ -159,8 +173,9 @@ namespace FreeSql.Sqlite
                     }
                     catch (Exception ex)
                     {
-                        if (_pool.SetUnavailable(ex) == true)
-                            throw new Exception($"【{this.Name}】状态不可用，等待后台检查程序恢复方可使用。{ex.Message}");
+                        if (_pool.SetUnavailable(ex, obj.LastGetTimeCopy) == true)
+                            throw new Exception($"【{this.Name}】Block access and wait for recovery: {ex.Message}");
+                        throw;
                     }
                 }
             }
@@ -175,9 +190,8 @@ namespace FreeSql.Sqlite
             {
                 if (obj.Value == null)
                 {
-                    if (_pool.SetUnavailable(new Exception("连接字符串错误")) == true)
-                        throw new Exception($"【{this.Name}】连接字符串错误，请检查。");
-                    return;
+                    _pool.SetUnavailable(new Exception(CoreStrings.S_ConnectionStringError), obj.LastGetTimeCopy);
+                    throw new Exception(CoreStrings.S_ConnectionStringError_Check(this.Name));
                 }
 
                 if (obj.Value.State != ConnectionState.Open || DateTime.Now.Subtract(obj.LastReturnTime).TotalSeconds > 60 && (await obj.Value.PingAsync()) == false)
@@ -189,8 +203,9 @@ namespace FreeSql.Sqlite
                     }
                     catch (Exception ex)
                     {
-                        if (_pool.SetUnavailable(ex) == true)
-                            throw new Exception($"【{this.Name}】状态不可用，等待后台检查程序恢复方可使用。{ex.Message}");
+                        if (_pool.SetUnavailable(ex, obj.LastGetTimeCopy) == true)
+                            throw new Exception($"【{this.Name}】Block access and wait for recovery: {ex.Message}");
+                        throw;
                     }
                 }
             }

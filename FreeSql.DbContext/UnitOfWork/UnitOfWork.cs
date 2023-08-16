@@ -55,7 +55,7 @@ namespace FreeSql
         public void Close()
         {
             if (_tran != null)
-                throw new Exception("已开启事务，不能禁用工作单元");
+                throw new Exception(DbContextStrings.TransactionHasBeenStarted);
 
             Enable = false;
         }
@@ -63,6 +63,9 @@ namespace FreeSql
         {
             Enable = true;
         }
+
+        DbContextScopedFreeSql _ormScoped;
+        public IFreeSql Orm => _ormScoped ?? (_ormScoped = DbContextScopedFreeSql.Create(_fsql, null, () => this));
 
         public IsolationLevel? IsolationLevel { get; set; }
 
@@ -96,7 +99,9 @@ namespace FreeSql
             catch (Exception ex)
             {
                 _fsql?.Aop.TraceAfterHandler?.Invoke(this, new Aop.TraceAfterEventArgs(_tranBefore, "失败", ex));
+#pragma warning disable CA2200 // 再次引发以保留堆栈详细信息
                 throw ex;
+#pragma warning restore CA2200 // 再次引发以保留堆栈详细信息
             }
             return _tran;
         }
@@ -108,7 +113,7 @@ namespace FreeSql
             {
                 if (_tran != null)
                 {
-                    _tran.Commit();
+                    if (_tran.Connection != null) _tran.Commit();
                     isCommited = true;
                     _fsql?.Aop.TraceAfterHandler?.Invoke(this, new Aop.TraceAfterEventArgs(_tranBefore, "提交", null));
 
@@ -120,7 +125,9 @@ namespace FreeSql
             {
                 if (isCommited == false)
                     _fsql?.Aop.TraceAfterHandler?.Invoke(this, new Aop.TraceAfterEventArgs(_tranBefore, "提交失败", ex));
+#pragma warning disable CA2200 // 再次引发以保留堆栈详细信息
                 throw ex;
+#pragma warning restore CA2200 // 再次引发以保留堆栈详细信息
             }
             finally
             {
@@ -135,7 +142,7 @@ namespace FreeSql
             {
                 if (_tran != null)
                 {
-                    _tran.Rollback();
+                    if (_tran.Connection != null) _tran.Rollback();
                     isRollbacked = true;
                     _fsql?.Aop.TraceAfterHandler?.Invoke(this, new Aop.TraceAfterEventArgs(_tranBefore, "回滚", null));
                 }
@@ -144,7 +151,9 @@ namespace FreeSql
             {
                 if (isRollbacked == false)
                     _fsql?.Aop.TraceAfterHandler?.Invoke(this, new Aop.TraceAfterEventArgs(_tranBefore, "回滚失败", ex));
+#pragma warning disable CA2200 // 再次引发以保留堆栈详细信息
                 throw ex;
+#pragma warning restore CA2200 // 再次引发以保留堆栈详细信息
             }
             finally
             {
@@ -154,6 +163,8 @@ namespace FreeSql
         }
 
         public DbContext.EntityChangeReport EntityChangeReport { get; } = new DbContext.EntityChangeReport();
+
+        public Dictionary<string, object> States { get; } = new Dictionary<string, object>();
 
         ~UnitOfWork() => this.Dispose();
         int _disposeCounter;

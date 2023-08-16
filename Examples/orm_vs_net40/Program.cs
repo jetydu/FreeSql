@@ -12,8 +12,9 @@ namespace orm_vs
     class Program
     {
         static IFreeSql fsql = new FreeSql.FreeSqlBuilder()
-                //.UseConnectionString(FreeSql.DataType.SqlServer, "Data Source=.;Integrated Security=True;Initial Catalog=freesqlTest;Pooling=true;Max Pool Size=20")
-                .UseConnectionString(FreeSql.DataType.MySql, "Data Source=127.0.0.1;Port=3306;User ID=root;Password=root;Initial Catalog=cccddd;Charset=utf8;SslMode=none;Max pool size=20")
+                .UseConnectionString(FreeSql.DataType.SqlServer, "Data Source=.;Integrated Security=True;Initial Catalog=freesqlTest;Pooling=true;Max Pool Size=20")
+                //.UseConnectionString(FreeSql.DataType.MySql, "Data Source=127.0.0.1;Port=3306;User ID=root;Password=root;Initial Catalog=cccddd;Charset=utf8;SslMode=none;Max pool size=20")
+                .UseConnectionString(FreeSql.DataType.Sqlite, "data source=test1.db;max pool size=5")
                 .UseAutoSyncStructure(false)
                 .UseNoneCommandParameter(true)
                 //.UseConfigEntityFromDbFirst(true)
@@ -33,24 +34,8 @@ namespace orm_vs
         //    });
         //}
 
-        static Lazy<IFreeSql> damengLazy = new Lazy<IFreeSql>(() => new FreeSql.FreeSqlBuilder()
-            .UseConnectionString(FreeSql.DataType.Dameng, "server=127.0.0.1;port=5236;user id=2user;password=123456789;database=2user")
-             //.UseConnectionFactory(FreeSql.DataType.Dameng, () => new Dm.DmConnection("data source=127.0.0.1:5236;user id=2user;password=123456789;Pooling=true;Max Pool Size=2"))
-             .UseAutoSyncStructure(true)
-            .UseNameConvert(FreeSql.Internal.NameConvertType.ToUpper)
-            //.UseNoneCommandParameter(true)
-
-            .UseMonitorCommand(
-                cmd => Trace.WriteLine(cmd.CommandText), //监听SQL命令对象，在执行前
-                (cmd, traceLog) => Console.WriteLine(traceLog))
-            .Build());
-        public static IFreeSql dameng => damengLazy.Value;
-
         static void Main(string[] args)
         {
-            dameng.Select<Song>().ToList();
-
-
             fsql.CodeFirst.SyncStructure(typeof(Song), typeof(Song_tag), typeof(Tag));
             //sugar.CodeFirst.InitTables(typeof(Song), typeof(Song_tag), typeof(Tag));
             //sugar创建表失败：SqlSugar.SqlSugarException: Sequence contains no elements
@@ -146,6 +131,15 @@ namespace orm_vs
             //    sugar.Queryable<Song>().Take(size).ToList();
             //sw.Stop();
             //sb.AppendLine($"SqlSugar Select {size}条数据，循环{forTime}次，耗时{sw.ElapsedMilliseconds}ms");
+
+            sw.Restart();
+            using (var conn = fsql.Ado.MasterPool.Get())
+            {
+                for (var a = 0; a < forTime; a++)
+                    Dapper.SqlMapper.Query<Song>(conn.Value, $"select top {size} * from freesql_song").ToList();
+            }
+            sw.Stop();
+            sb.AppendLine($"Dapper Select {size}条数据，循环{forTime}次，耗时{sw.ElapsedMilliseconds}ms");
         }
 
         static void Insert(StringBuilder sb, int forTime, int size)

@@ -1,8 +1,12 @@
 ﻿using FreeSql;
 using FreeSql.Internal;
+using FreeSql.Internal.CommonProvider;
+using FreeSql.Internal.Model;
+using FreeSql.Internal.ObjectPool;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.Common;
 using System.Text;
 
 namespace FreeSql
@@ -18,11 +22,41 @@ namespace FreeSql
         {
             if (fsql == null) return null;
             var scopedfsql = fsql as DbContextScopedFreeSql;
-            if (scopedfsql == null) return new DbContextScopedFreeSql { _originalFsql = fsql, _resolveDbContext = resolveDbContext, _resolveUnitOfWork = resolveUnitOfWork };
+            if (scopedfsql == null)
+                return new DbContextScopedFreeSql
+                {
+                    _originalFsql = fsql,
+                    _resolveDbContext = resolveDbContext,
+                    _resolveUnitOfWork = resolveUnitOfWork,
+                    Ado = new ScopeTransactionAdo(fsql.Ado as AdoProvider, () =>
+                    {
+                        var db = resolveDbContext?.Invoke();
+                        db?.FlushCommand();
+                        return resolveUnitOfWork?.Invoke()?.GetOrBeginTransaction();
+                    })
+                };
             return Create(scopedfsql._originalFsql, resolveDbContext, resolveUnitOfWork);
         }
 
-        public IAdo Ado => _originalFsql.Ado;
+        class ScopeTransactionAdo : AdoProvider
+        {
+            AdoProvider _ado;
+            public ScopeTransactionAdo(AdoProvider ado, Func<DbTransaction> resolveTran) : base(ado.DataType, null, null)
+            {
+                _ado = ado;
+                base.ResolveTransaction = resolveTran;
+                base.ConnectionString = ado.ConnectionString;
+                base.SlaveConnectionStrings = ado.SlaveConnectionStrings;
+                base.Identifier = ado.Identifier;
+                base.MasterPool = ado.MasterPool;
+                base._util = ado._util;
+            }
+            public override object AddslashesProcessParam(object param, Type mapType, ColumnInfo mapColumn) => _ado.AddslashesProcessParam(param, mapType, mapColumn);
+            public override DbCommand CreateCommand() => _ado.CreateCommand();
+            public override DbParameter[] GetDbParamtersByObject(string sql, object obj) => _ado.GetDbParamtersByObject(sql, obj);
+            public override void ReturnConnection(IObjectPool<DbConnection> pool, Object<DbConnection> conn, Exception ex) => _ado.ReturnConnection(pool, conn, ex);
+        }
+        public IAdo Ado { get; private set; }
         public IAop Aop => _originalFsql.Aop;
         public ICodeFirst CodeFirst => _originalFsql.CodeFirst;
         public IDbFirst DbFirst => _originalFsql.DbFirst;
@@ -30,14 +64,16 @@ namespace FreeSql
         public void Dispose() { }
 
         public void Transaction(Action handler) => _originalFsql.Transaction(handler);
-        public void Transaction(TimeSpan timeout, Action handler) => _originalFsql.Transaction(timeout, handler);
-        public void Transaction(IsolationLevel isolationLevel, TimeSpan timeout, Action handler) => _originalFsql.Transaction(isolationLevel, timeout, handler);
+        public void Transaction(IsolationLevel isolationLevel, Action handler) => _originalFsql.Transaction(isolationLevel, handler);
 
         public ISelect<T1> Select<T1>() where T1 : class
         {
             var db = _resolveDbContext?.Invoke();
             db?.FlushCommand();
-            var select = _originalFsql.Select<T1>().WithTransaction(_resolveUnitOfWork()?.GetOrBeginTransaction(false));
+            var uow = _resolveUnitOfWork?.Invoke();
+            var uowIsolationLevel = uow?.IsolationLevel ?? IsolationLevel.Unspecified;
+            var select = _originalFsql.Select<T1>().WithTransaction(uow?.GetOrBeginTransaction(uowIsolationLevel != IsolationLevel.Unspecified));
+            (select as Select0Provider)._resolveHookTransaction = () => uow?.GetOrBeginTransaction();
             if (db?.Options.EnableGlobalFilter == false) select.DisableGlobalFilter();
             return select;
         }
@@ -47,7 +83,7 @@ namespace FreeSql
         {
             var db = _resolveDbContext?.Invoke();
             db?.FlushCommand();
-            var delete = _originalFsql.Delete<T1>().WithTransaction(_resolveUnitOfWork()?.GetOrBeginTransaction());
+            var delete = _originalFsql.Delete<T1>().WithTransaction(_resolveUnitOfWork?.Invoke()?.GetOrBeginTransaction());
             if (db?.Options.EnableGlobalFilter == false) delete.DisableGlobalFilter();
             return delete;
         }
@@ -57,7 +93,7 @@ namespace FreeSql
         {
             var db = _resolveDbContext?.Invoke();
             db?.FlushCommand();
-            var update = _originalFsql.Update<T1>().WithTransaction(_resolveUnitOfWork()?.GetOrBeginTransaction());
+            var update = _originalFsql.Update<T1>().WithTransaction(_resolveUnitOfWork?.Invoke()?.GetOrBeginTransaction());
             if (db?.Options.NoneParameter != null) update.NoneParameter(db.Options.NoneParameter.Value);
             if (db?.Options.EnableGlobalFilter == false) update.DisableGlobalFilter();
             return update;
@@ -68,7 +104,7 @@ namespace FreeSql
         {
             var db = _resolveDbContext?.Invoke();
             db?.FlushCommand();
-            var insert = _originalFsql.Insert<T1>().WithTransaction(_resolveUnitOfWork()?.GetOrBeginTransaction());
+            var insert = _originalFsql.Insert<T1>().WithTransaction(_resolveUnitOfWork?.Invoke()?.GetOrBeginTransaction());
             if (db?.Options.NoneParameter != null) insert.NoneParameter(db.Options.NoneParameter.Value);
             return insert;
         }
@@ -77,5 +113,11 @@ namespace FreeSql
         public IInsert<T1> Insert<T1>(List<T1> source) where T1 : class => Insert<T1>().AppendData(source);
         public IInsert<T1> Insert<T1>(IEnumerable<T1> source) where T1 : class => Insert<T1>().AppendData(source);
 
+        public IInsertOrUpdate<T1> InsertOrUpdate<T1>() where T1 : class
+        {
+            var db = _resolveDbContext?.Invoke();
+            db?.FlushCommand();
+            return _originalFsql.InsertOrUpdate<T1>().WithTransaction(_resolveUnitOfWork?.Invoke()?.GetOrBeginTransaction());
+        }
     }
 }

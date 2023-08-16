@@ -8,6 +8,8 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading;
+using FreeSql.Internal.CommonProvider;
+using System.Data;
 
 namespace FreeSql
 {
@@ -28,12 +30,14 @@ namespace FreeSql
     public abstract partial class DbSet<TEntity> : IDbSet where TEntity : class
     {
         internal DbContext _db { get; set; }
-        internal IUnitOfWork _uow { get; set; }
+        internal virtual IUnitOfWork _uow { get; set; }
 
         protected virtual ISelect<TEntity> OrmSelect(object dywhere)
         {
             DbContextFlushCommand(); //查询前先提交，否则会出脏读
-            var select = _db.OrmOriginal.Select<TEntity>().AsType(_entityType).WithTransaction(_uow?.GetOrBeginTransaction(false)).TrackToList(TrackToList).WhereDynamic(dywhere);
+            var uowIsolationLevel = _uow?.IsolationLevel ?? IsolationLevel.Unspecified;
+            var select = _db.OrmOriginal.Select<TEntity>().AsType(_entityType).WithTransaction(_uow?.GetOrBeginTransaction(uowIsolationLevel != IsolationLevel.Unspecified)).TrackToList(TrackToList).WhereDynamic(dywhere);
+            (select as Select0Provider)._resolveHookTransaction = () => _uow?.GetOrBeginTransaction();
             if (_db.Options.EnableGlobalFilter == false) select.DisableGlobalFilter();
             return select;
         }
@@ -47,6 +51,8 @@ namespace FreeSql
             {
                 this._dicUpdateTimes.Clear();
                 this._states.Clear();
+                this._statesEditing.Clear();
+                this._dataEditing = null;
             }
             finally
             {
@@ -60,15 +66,26 @@ namespace FreeSql
             if (_db.Options.NoneParameter != null) insert.NoneParameter(_db.Options.NoneParameter.Value);
             return insert;
         }
-        protected virtual IInsert<TEntity> OrmInsert(TEntity data) => OrmInsert().AppendData(data);
-        protected virtual IInsert<TEntity> OrmInsert(IEnumerable<TEntity> data) => OrmInsert().AppendData(data);
+        protected virtual IInsert<TEntity> OrmInsert(TEntity data)
+        {
+            var insert = OrmInsert();
+            if (data != null) (insert as InsertProvider<TEntity>)._source.Add(data); //防止 Aop.AuditValue 触发两次
+            return insert;
+        }
+        protected virtual IInsert<TEntity> OrmInsert(IEnumerable<TEntity> data)
+        {
+            var insert = OrmInsert();
+            if (data != null) (insert as InsertProvider<TEntity>)._source.AddRange(data.Where(a => a != null)); //防止 Aop.AuditValue 触发两次
+            return insert;
+        }
 
         protected virtual IUpdate<TEntity> OrmUpdate(IEnumerable<TEntity> entitys)
         {
             var update = _db.OrmOriginal.Update<TEntity>().AsType(_entityType).WithTransaction(_uow?.GetOrBeginTransaction());
             if (_db.Options.NoneParameter != null) update.NoneParameter(_db.Options.NoneParameter.Value);
             if (_db.Options.EnableGlobalFilter == false) update.DisableGlobalFilter();
-            return update.SetSource(entitys);
+            if (entitys != null) (update as UpdateProvider<TEntity>)._source.AddRange(entitys.Where(a => a != null)); //防止 Aop.AuditValue 触发两次
+            return update;
         }
         protected virtual IDelete<TEntity> OrmDelete(object dywhere)
         {
@@ -98,6 +115,7 @@ namespace FreeSql
                     if (itemType == typeof(object)) return;
                     if (itemType.FullName.Contains("FreeSqlLazyEntity__")) itemType = itemType.BaseType;
                     if (_db.OrmOriginal.CodeFirst.GetTableByEntity(itemType)?.Primarys.Any() != true) return;
+                    if (itemType.GetConstructor(Type.EmptyTypes) == null) return;
                     var dbset = _db.Set(itemType);
                     dbset?.GetType().GetMethod("TrackToList", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(dbset, new object[] { list });
                     return;
@@ -123,12 +141,11 @@ namespace FreeSql
         public ISelect<TEntity> WhereIf(bool condition, Expression<Func<TEntity, bool>> exp) => this.OrmSelect(null).WhereIf(condition, exp);
 
         protected ConcurrentDictionary<string, EntityState> _states = new ConcurrentDictionary<string, EntityState>();
-        internal ConcurrentDictionary<string, EntityState> _statesInternal => _states;
         TableInfo _tablePriv;
         protected TableInfo _table => _tablePriv ?? (_tablePriv = _db.OrmOriginal.CodeFirst.GetTableByEntity(_entityType));
-        ColumnInfo[] _tableIdentitysPriv, _tableServerTimesPriv;
-        protected ColumnInfo[] _tableIdentitys => _tableIdentitysPriv ?? (_tableIdentitysPriv = _table.Primarys.Where(a => a.Attribute.IsIdentity).ToArray());
-        protected ColumnInfo[] _tableServerTimes => _tableServerTimesPriv ?? (_tableServerTimesPriv = _table.Primarys.Where(a => a.Attribute.ServerTime != DateTimeKind.Unspecified).ToArray());
+        ColumnInfo[] _tableIdentitysPriv, _tableReturnColumnsPriv;
+        protected ColumnInfo[] _tableIdentitys => _tableIdentitysPriv ?? (_tableIdentitysPriv = _table.ColumnsByPosition.Where(a => a.Attribute.IsIdentity).ToArray());
+        protected ColumnInfo[] _tableReturnColumns => _tableReturnColumnsPriv ?? (_tableReturnColumnsPriv = _table.ColumnsByPosition.Where(a => a.Attribute.IsIdentity || string.IsNullOrWhiteSpace(a.DbInsertValue) == false).ToArray());
         protected Type _entityType = typeof(TEntity);
         public Type EntityType => _entityType;
 
@@ -139,17 +156,17 @@ namespace FreeSql
         /// <returns></returns>
         public DbSet<TEntity> AsType(Type entityType)
         {
-            if (entityType == typeof(object)) throw new Exception("ISelect.AsType 参数不支持指定为 object");
+            if (entityType == typeof(object)) throw new Exception(CoreStrings.TypeAsType_NotSupport_Object("DbSet"));
             if (entityType == _entityType) return this;
             var newtb = _db.OrmOriginal.CodeFirst.GetTableByEntity(entityType);
-            _entityType = entityType;
-            _tablePriv = newtb ?? throw new Exception("DbSet.AsType 参数错误，请传入正确的实体类型");
+            _tablePriv = newtb ?? throw new Exception(CoreStrings.Type_AsType_Parameter_Error("DbSet"));
             _tableIdentitysPriv = null;
-            _tableServerTimesPriv = null;
+            _tableReturnColumnsPriv = null;
+            _entityType = entityType;
             return this;
         }
 
-        Dictionary<Type, DbSet<object>> _dicDbSetObjects = new Dictionary<Type, DbSet<object>>();
+        internal Dictionary<Type, DbSet<object>> _dicDbSetObjects = new Dictionary<Type, DbSet<object>>();
         DbSet<object> GetDbSetObject(Type et)
         {
             if (_dicDbSetObjects.TryGetValue(et, out var tryds)) return tryds;
@@ -164,6 +181,15 @@ namespace FreeSql
         void StatesCopyToDbSetObject(DbSet<object> ds)
         {
             ds.AttachRange(_states.Values.OrderBy(a => a.Time).Select(a => a.Value).ToArray());
+        }
+        void StatesRemoveByObjects(IEnumerable<object> data)
+        {
+            if (data == null) return;
+            foreach (var item in data)
+            {
+                var stateKey = _db.OrmOriginal.GetEntityKeyString(_entityType, item, false);
+                _states.TryRemove(stateKey, out var trystate);
+            }
         }
 
         public class EntityState
@@ -187,11 +213,11 @@ namespace FreeSql
         public void AttachRange(IEnumerable<TEntity> data)
         {
             if (data == null || data.Any() == false) return;
-            if (_table.Primarys.Any() == false) throw new Exception($"不可附加，实体没有主键：{_db.OrmOriginal.GetEntityString(_entityType, data.First())}");
+            if (_table.Primarys.Any() == false) throw new Exception(DbContextStrings.CannotAttach_EntityHasNo_PrimaryKey(_db.OrmOriginal.GetEntityString(_entityType, data.First())));
             foreach (var item in data)
             {
                 var key = _db.OrmOriginal.GetEntityKeyString(_entityType, item, false);
-                if (string.IsNullOrEmpty(key)) throw new Exception($"不可附加，未设置主键的值：{_db.OrmOriginal.GetEntityString(_entityType, item)}");
+                if (string.IsNullOrEmpty(key)) throw new Exception(DbContextStrings.CannotAttach_PrimaryKey_NotSet(_db.OrmOriginal.GetEntityString(_entityType, item)));
 
                 _states.AddOrUpdate(key, k => CreateEntityState(item), (k, ov) =>
                 {
@@ -208,7 +234,7 @@ namespace FreeSql
         public DbSet<TEntity> AttachOnlyPrimary(TEntity data)
         {
             if (data == null) return this;
-            var pkitem = (TEntity)Activator.CreateInstance(_entityType);
+            var pkitem = (TEntity)_entityType.CreateInstanceGetDefaultValue();
             foreach (var pk in _db.OrmOriginal.CodeFirst.GetTableByEntity(_entityType).Primarys)
             {
                 var colVal = _db.OrmOriginal.GetEntityValueWithPropertyName(_entityType, data, pk.CsName);
@@ -216,6 +242,31 @@ namespace FreeSql
             }
             this.Attach(pkitem);
             return this;
+        }
+
+        /// <summary>
+        /// 比较实体，计算出值发生变化的属性，以及属性变化的前后值
+        /// </summary>
+        /// <param name="newdata">最新的实体对象，它将与附加实体的状态对比</param>
+        /// <returns>key: 属性名, value: [旧值, 新值]</returns>
+        public Dictionary<string, object[]> CompareState(TEntity newdata)
+        {
+            if (newdata == null) return null;
+            if (_table.Primarys.Any() == false) throw new Exception(DbContextStrings.Incomparable_EntityHasNo_PrimaryKey(_db.OrmOriginal.GetEntityString(_entityType, newdata)));
+            var key = _db.OrmOriginal.GetEntityKeyString(_entityType, newdata, false);
+            if (string.IsNullOrEmpty(key)) throw new Exception(DbContextStrings.Incomparable_PrimaryKey_NotSet(_db.OrmOriginal.GetEntityString(_entityType, newdata)));
+            if (_states.TryGetValue(key, out var oldState) == false || oldState == null)
+                return _table.ColumnsByCs.ToDictionary(a => a.Key, a => new object[]
+                {
+                    _db.OrmOriginal.GetEntityValueWithPropertyName(_entityType, newdata, a.Key),
+                    null
+                });
+
+            return _db.OrmOriginal.CompareEntityValueReturnColumns(_entityType, oldState.Value, newdata, false).ToDictionary(a => a, a => new object[]
+            {
+                _db.OrmOriginal.GetEntityValueWithPropertyName(_entityType, newdata, a),
+                _db.OrmOriginal.GetEntityValueWithPropertyName(_entityType, oldState.Value, a)
+            });
         }
 
         /// <summary>
@@ -231,8 +282,8 @@ namespace FreeSql
         {
             if (data == null) throw new ArgumentNullException(nameof(data));
             var key = _db.OrmOriginal.GetEntityKeyString(_entityType, data, false);
-            var state = new EntityState((TEntity)Activator.CreateInstance(_entityType), key);
-            _db.OrmOriginal.MapEntityValue(_entityType, data, state.Value);
+            var state = new EntityState((TEntity)_entityType.CreateInstanceGetDefaultValue(), key);
+           _db.OrmOriginal.MapEntityValue(_entityType, data, state.Value);
             return state;
         }
         bool? ExistsInStates(TEntity data)
@@ -263,7 +314,7 @@ namespace FreeSql
             }
             if (_table.Primarys.Any() == false)
             {
-                if (isThrow) throw new Exception($"不可添加，实体没有主键：{_db.OrmOriginal.GetEntityString(_entityType, data)}");
+                if (isThrow) throw new Exception(DbContextStrings.CannotAdd_EntityHasNo_PrimaryKey(_db.OrmOriginal.GetEntityString(_entityType, data)));
                 return false;
             }
             FreeSql.Internal.CommonProvider.InsertProvider<TEntity>.AuditDataValue(this, data, _db.OrmOriginal, _table, null);
@@ -274,13 +325,19 @@ namespace FreeSql
                 {
                     case DataType.SqlServer:
                     case DataType.OdbcSqlServer:
+                    case DataType.CustomSqlServer:
                     case DataType.PostgreSQL:
                     case DataType.OdbcPostgreSQL:
+                    case DataType.CustomPostgreSQL:
+                    case DataType.KingbaseES:
+                    case DataType.OdbcKingbaseES:
+                    case DataType.ShenTong:
+                    case DataType.ClickHouse:
                         return true;
                     default:
                         if (_tableIdentitys.Length == 1 && _table.Primarys.Length == 1)
                             return true;
-                        if (isThrow) throw new Exception($"不可添加，未设置主键的值：{_db.OrmOriginal.GetEntityString(_entityType, data)}");
+                        if (isThrow) throw new Exception(DbContextStrings.CannotAdd_PrimaryKey_NotSet(_db.OrmOriginal.GetEntityString(_entityType, data)));
                         return false;
                 }
             }
@@ -288,13 +345,14 @@ namespace FreeSql
             {
                 if (_states.ContainsKey(key))
                 {
-                    if (isThrow) throw new Exception($"不可添加，已存在于状态管理：{_db.OrmOriginal.GetEntityString(_entityType, data)}");
+                    if (isThrow) throw new Exception(DbContextStrings.CannotAdd_AlreadyExistsInStateManagement(_db.OrmOriginal.GetEntityString(_entityType, data)));
                     return false;
                 }
+                if (_db.OrmOriginal.Ado.DataType == DataType.ClickHouse) return true;
                 var idval = _db.OrmOriginal.GetEntityIdentityValueWithPrimary(_entityType, data);
                 if (idval > 0)
                 {
-                    if (isThrow) throw new Exception($"不可添加，自增属性有值：{_db.OrmOriginal.GetEntityString(_entityType, data)}");
+                    if (isThrow) throw new Exception(DbContextStrings.CannotAdd_SelfIncreasingHasValue(_db.OrmOriginal.GetEntityString(_entityType, data)));
                     return false;
                 }
             }
@@ -321,19 +379,19 @@ namespace FreeSql
             }
             if (_table.Primarys.Any() == false)
             {
-                if (isThrow) throw new Exception($"不可更新，实体没有主键：{_db.OrmOriginal.GetEntityString(_entityType, data)}");
+                if (isThrow) throw new Exception(DbContextStrings.CannotUpdate_EntityHasNo_PrimaryKey(_db.OrmOriginal.GetEntityString(_entityType, data)));
                 return false;
             }
             FreeSql.Internal.CommonProvider.UpdateProvider<TEntity>.AuditDataValue(this, data, _db.OrmOriginal, _table, null);
             var key = _db.OrmOriginal.GetEntityKeyString(_entityType, data, false);
             if (string.IsNullOrEmpty(key))
             {
-                if (isThrow) throw new Exception($"不可更新，未设置主键的值：{_db.OrmOriginal.GetEntityString(_entityType, data)}");
+                if (isThrow) throw new Exception(DbContextStrings.CannotUpdate_PrimaryKey_NotSet(_db.OrmOriginal.GetEntityString(_entityType, data)));
                 return false;
             }
             if (_states.TryGetValue(key, out var tryval) == false)
             {
-                if (isThrow) throw new Exception($"不可更新，数据未被跟踪，应该先查询 或者 Attach：{_db.OrmOriginal.GetEntityString(_entityType, data)}");
+                if (isThrow) throw new Exception(DbContextStrings.CannotUpdate_DataShouldQueryOrAttach(_db.OrmOriginal.GetEntityString(_entityType, data)));
                 return false;
             }
             return true;
@@ -359,13 +417,13 @@ namespace FreeSql
             }
             if (_table.Primarys.Any() == false)
             {
-                if (isThrow) throw new Exception($"不可删除，实体没有主键：{_db.OrmOriginal.GetEntityString(_entityType, data)}");
+                if (isThrow) throw new Exception(DbContextStrings.CannotDelete_EntityHasNo_PrimaryKey(_db.OrmOriginal.GetEntityString(_entityType, data)));
                 return false;
             }
             var key = _db.OrmOriginal.GetEntityKeyString(_entityType, data, false);
             if (string.IsNullOrEmpty(key))
             {
-                if (isThrow) throw new Exception($"不可删除，未设置主键的值：{_db.OrmOriginal.GetEntityString(_entityType, data)}");
+                if (isThrow) throw new Exception(DbContextStrings.CannotDelete_PrimaryKey_NotSet(_db.OrmOriginal.GetEntityString(_entityType, data)));
                 return false;
             }
             //if (_states.TryGetValue(key, out var tryval) == false) {

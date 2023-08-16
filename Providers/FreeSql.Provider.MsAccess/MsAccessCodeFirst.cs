@@ -39,6 +39,7 @@ namespace FreeSql.MsAccess
 
                 { typeof(byte[]).FullName, CsToDb.New(OleDbType.VarBinary, "varbinary", "varbinary(255)", false, null, new byte[0]) },
                 { typeof(string).FullName, CsToDb.New(OleDbType.VarChar, "varchar", "varchar(255)", false, null, "") },
+                { typeof(char).FullName, CsToDb.New(OleDbType.VarChar, "varchar", "varchar(1)", false, null, '\0') },
 
                 { typeof(Guid).FullName, CsToDb.New(OleDbType.Guid, "varchar", "varchar(36) NOT NULL", false, false, Guid.Empty) },{ typeof(Guid?).FullName, CsToDb.New(OleDbType.Guid, "varchar", "varchar(36)", false, true, null) },
             };
@@ -56,8 +57,8 @@ namespace FreeSql.MsAccess
             if (enumType != null)
             {
                 var newItem = enumType.GetCustomAttributes(typeof(FlagsAttribute), false).Any() ?
-                    CsToDb.New(OleDbType.BigInt, "decimal", $"decimal(20,0){(type.IsEnum ? " NOT NULL" : "")}", false, type.IsEnum ? false : true, Enum.GetValues(enumType).GetValue(0)) :
-                    CsToDb.New(OleDbType.Integer, "decimal", $"decimal(11,0){(type.IsEnum ? " NOT NULL" : "")}", false, type.IsEnum ? false : true, Enum.GetValues(enumType).GetValue(0));
+                    CsToDb.New(OleDbType.BigInt, "decimal", $"decimal(20,0){(type.IsEnum ? " NOT NULL" : "")}", false, type.IsEnum ? false : true, enumType.CreateInstanceGetDefaultValue()) :
+                    CsToDb.New(OleDbType.Integer, "decimal", $"decimal(11,0){(type.IsEnum ? " NOT NULL" : "")}", false, type.IsEnum ? false : true, enumType.CreateInstanceGetDefaultValue());
                 if (_dicCsToDb.ContainsKey(type.FullName) == false)
                 {
                     lock (_dicCsToDbLock)
@@ -79,8 +80,8 @@ namespace FreeSql.MsAccess
             {
                 if (sb.Length > 0) sb.Append("\r\n");
                 var tb = _commonUtils.GetTableByEntity(obj.entityType);
-                if (tb == null) throw new Exception($"类型 {obj.entityType.FullName} 不可迁移");
-                if (tb.Columns.Any() == false) throw new Exception($"类型 {obj.entityType.FullName} 不可迁移，可迁移属性0个");
+                if (tb == null) throw new Exception(CoreStrings.S_Type_IsNot_Migrable(obj.entityType.FullName));
+                if (tb.Columns.Any() == false) throw new Exception(CoreStrings.S_Type_IsNot_Migrable_0Attributes(obj.entityType.FullName));
                 var tbname = tb.DbName;
                 var tboldname = tb.DbOldName; //旧表名
                 if (string.Compare(tbname, tboldname, true) == 0) tboldname = null;
@@ -139,13 +140,14 @@ namespace FreeSql.MsAccess
                 };
                 Action<string> createTableIndex = tn =>
                 {
+                    var oldtn = tn;
                     tn = _commonUtils.QuoteSqlName(tn);
                     //创建表的索引
                     foreach (var uk in tb.Indexes)
                     {
                         sb.Append("CREATE ");
                         if (uk.IsUnique) sb.Append("UNIQUE ");
-                        sb.Append("INDEX ").Append(_commonUtils.QuoteSqlName(uk.Name)).Append(" ON ").Append(tn).Append("(");
+                        sb.Append("INDEX ").Append(_commonUtils.QuoteSqlName(ReplaceIndexName(uk.Name, oldtn))).Append(" ON ").Append(tn).Append("(");
                         foreach (var tbcol in uk.Columns)
                         {
                             sb.Append(_commonUtils.QuoteSqlName(tbcol.Column.Attribute.Name));
@@ -175,7 +177,7 @@ namespace FreeSql.MsAccess
                     istmpatler = true;
                 }
                 if (tboldname != null && isexistsTb == true)
-                    throw new Exception($"旧表(OldName)：{tboldname} 存在，数据库已存在 {tbname} 表，无法改名");
+                    throw new Exception(CoreStrings.S_OldTableExists(tboldname, tbname));
 
                 DataTable schemaColumns = null;
                 DataTable schemaDataTypes = null;
@@ -353,9 +355,10 @@ namespace FreeSql.MsAccess
                 {
                     foreach (var tbcol in tb.ColumnsByPosition)
                     {
+                        if (istmpatler) break;
                         var dbtypeNoneNotNull = Regex.Replace(tbcol.Attribute.DbType, @"NOT\s+NULL", "NULL");
                         if (tbstruct.TryGetValue(tbcol.Attribute.Name, out var tbstructcol) ||
-                        string.IsNullOrEmpty(tbcol.Attribute.OldName) == false && tbstruct.TryGetValue(tbcol.Attribute.OldName, out tbstructcol))
+                            string.IsNullOrEmpty(tbcol.Attribute.OldName) == false && tbstruct.TryGetValue(tbcol.Attribute.OldName, out tbstructcol))
                         {
                             if (tbstructcol.sqlType != "LONG" && tbcol.Attribute.DbType.StartsWith(tbstructcol.sqlType, StringComparison.CurrentCultureIgnoreCase) == false)
                                 istmpatler = true;
@@ -371,11 +374,15 @@ namespace FreeSql.MsAccess
                         //添加列
                         istmpatler = true;
                     }
+                }
+                if (istmpatler == false)
+                {
                     var dsuk = getIndexesByTableName(tbtmp);
                     foreach (var uk in tb.Indexes)
                     {
                         if (string.IsNullOrEmpty(uk.Name) || uk.Columns.Any() == false) continue;
-                        var dsukfind1 = dsuk.Where(a => string.Compare(a[1], uk.Name, true) == 0).ToArray();
+                        var ukname = ReplaceIndexName(uk.Name, tbname);
+                        var dsukfind1 = dsuk.Where(a => string.Compare(a[1], ukname, true) == 0).ToArray();
                         if (dsukfind1.Any() == false || dsukfind1.Length != uk.Columns.Length || dsukfind1.Where(a => (a[3] == "1") == uk.IsUnique && uk.Columns.Where(b => string.Compare(b.Column.Attribute.Name, a[0], true) == 0 && (a[2] == "1") == b.IsDesc).Any()).Count() != uk.Columns.Length)
                             istmpatler = true;
                     }
@@ -387,7 +394,8 @@ namespace FreeSql.MsAccess
                 }
 
                 Dictionary<string, bool> dicDropTable = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
-                Action<string> dropTable = tn => {
+                Action<string> dropTable = tn =>
+                {
                     if (dicDropTable.ContainsKey(tn)) return;
                     dicDropTable.Add(tn, true);
                     sb.Append("DROP TABLE ").Append(_commonUtils.QuoteSqlName(tn)).Append(";\r\n");
@@ -464,7 +472,6 @@ namespace FreeSql.MsAccess
             var scripts = ddl.Split(new string[] { ";\r\n" }, StringSplitOptions.None).Where(a => string.IsNullOrEmpty(a.Trim()) == false).ToArray();
 
             if (scripts.Any() == false) return 0;
-            if (scripts.Length == 1) return base.ExecuteDDLStatements(ddl);
 
             var affrows = 0;
             foreach (var script in scripts)

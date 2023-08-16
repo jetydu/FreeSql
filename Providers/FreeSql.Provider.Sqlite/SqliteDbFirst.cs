@@ -26,7 +26,7 @@ namespace FreeSql.Sqlite
         public int GetDbType(DbColumnInfo column) => (int)GetSqlDbType(column);
         DbType GetSqlDbType(DbColumnInfo column)
         {
-            var dbfull = column.DbTypeTextFull.ToLower();
+            var dbfull = column.DbTypeTextFull?.ToLower();
             switch (dbfull)
             {
                 case "boolean": return DbType.Boolean;
@@ -50,7 +50,7 @@ namespace FreeSql.Sqlite
 
                 case "character(36)": return DbType.AnsiString;
             }
-            switch (column.DbTypeText.ToLower())
+            switch (column.DbTypeText?.ToLower())
             {
                 case "int":
                     _dicDbToCs.TryAdd(dbfull, _dicDbToCs["integer"]);
@@ -99,10 +99,10 @@ namespace FreeSql.Sqlite
                     return DbType.String;
 
                 default:
-                    _dicDbToCs.TryAdd(dbfull, _dicDbToCs["nvarchar(255)"]);
+                    if (dbfull != null) _dicDbToCs.TryAdd(dbfull, _dicDbToCs["nvarchar(255)"]);
                     return DbType.String;
             }
-            throw new NotImplementedException($"未实现 {column.DbTypeTextFull} 类型映射");
+            throw new NotImplementedException(CoreStrings.S_TypeMappingNotImplemented(column.DbTypeTextFull));
         }
 
         static ConcurrentDictionary<string, DbToCs> _dicDbToCs = new ConcurrentDictionary<string, DbToCs>(StringComparer.CurrentCultureIgnoreCase);
@@ -149,14 +149,34 @@ namespace FreeSql.Sqlite
             return _orm.Ado.ExecuteArray("PRAGMA database_list").Select(a => string.Concat(a[1])).ToList();
         }
 
-        public List<DbTableInfo> GetTablesByDatabase(params string[] database2)
+        public bool ExistsTable(string name, bool ignoreCase)
+        {
+            if (string.IsNullOrEmpty(name)) return false;
+            var tbname = _commonUtils.SplitTableName(name);
+            if (tbname?.Length == 1) tbname = new[] { "main", tbname[0] };
+            if (ignoreCase) tbname = tbname.Select(a => a.ToLower()).ToArray();
+            var sql = $@" select 1 from {_commonUtils.QuoteSqlName(tbname[0])}.sqlite_master where type='table' and {(ignoreCase ? "lower(tbl_name)" : "tbl_name")}={_commonUtils.FormatSql("{0}", tbname[1])}";
+            return string.Concat(_orm.Ado.ExecuteScalar(CommandType.Text, sql)) == "1";
+        }
+
+        public DbTableInfo GetTableByName(string name, bool ignoreCase = true) => GetTables(null, name, ignoreCase)?.FirstOrDefault();
+        public List<DbTableInfo> GetTablesByDatabase(params string[] database) => GetTables(database, null, false);
+
+        public List<DbTableInfo> GetTables(string[] database, string tablename, bool ignoreCase)
         {
             var loc1 = new List<DbTableInfo>();
             var loc2 = new Dictionary<string, DbTableInfo>();
             var loc3 = new Dictionary<string, Dictionary<string, DbColumnInfo>>();
-            var database = database2?.ToArray();
-
-            if (database == null || database.Any() == false) database = GetDatabases().ToArray();
+            string[] tbname = null;
+            if (string.IsNullOrEmpty(tablename) == false)
+            {
+                tbname = _commonUtils.SplitTableName(tablename);
+                if (tbname?.Length == 1) tbname = new[] { "main", tbname[0] };
+                if (ignoreCase) tbname = tbname.Select(a => a.ToLower()).ToArray();
+                database = new[] { tbname[0] };
+            }
+            else if (database == null || database.Any() == false)
+                database = GetDatabases().ToArray();
             if (database.Any() == false) return loc1;
 
             Action<object[], int> addColumn = (row, position) =>
@@ -184,7 +204,7 @@ namespace FreeSql.Sqlite
                     DbTypeText = type,
                     DbTypeTextFull = sqlType,
                     Table = loc2[table_id],
-                    Coment = comment,
+                    Comment = comment,
                     DefaultValue = defaultValue,
                     Position = position
                 });
@@ -194,14 +214,15 @@ namespace FreeSql.Sqlite
 
             foreach (var db in database)
             {
-                var sql = $@"select 
+                var sql = $@"
+select 
 '{db}.' || tbl_name,
 '{db}',
 tbl_name,
 '' Comment,
 'TABLE',
 sql
-from {db}.sqlite_master where type = 'table'";
+from {db}.sqlite_master where type='table'{(tbname == null ? "" : $" and {(ignoreCase ? "lower(tbl_name)" : "tbl_name")}={_commonUtils.FormatSql("{0}", tbname[1])}")}";
                 var ds = _orm.Ado.ExecuteArray(CommandType.Text, sql);
                 if (ds == null) continue;
 
@@ -266,41 +287,83 @@ from {db}.sqlite_master where type = 'table'";
                             ds2item[2] = Regex.Replace(string.Concat(col[2]), @"\(\d+(\b*,\b*\d+)?\)", "").ToUpper();
                             ds2item[4] = string.Concat(col[2]).ToUpper();
                             ds2item[5] = string.Concat(col[5]) == "0" && string.Concat(col[3]) == "0" ? 1 : 0;
-                            ds2item[6] = is_identity;
+                            ds2item[6] = is_identity ? 1 : 0;
                             ds2item[7] = string.Concat(col[5]) == "1" ? 1 : 0;
                             ds2item[8] = "";
                             ds2item[9] = string.Concat(col[4]);
                             addColumn(ds2item, ++position);
                         }
 
-                        var fks = _orm.Ado.ExecuteArray(CommandType.Text, $"PRAGMA \"{db}\".foreign_key_list(\"{table}\")");
-                        if (fks != null && fks.Length > 0)
+                        Dictionary<string, DbIndexInfo> indexes = new Dictionary<string, DbIndexInfo>();
+                        var dbIndexes = _orm.Ado.ExecuteArray(CommandType.Text, $"PRAGMA \"{db}\".INDEX_LIST(\"{table}\")");
+                        foreach (var dbIndex in dbIndexes)
                         {
-                            var fkColumns = new Dictionary<string, Dictionary<string, DbForeignInfo>>();
-                            foreach (var fk in fks)
+                            if (string.Concat(dbIndex[3]) == "pk") continue;
+                            var dbIndexesColumns = _orm.Ado.ExecuteArray(CommandType.Text, $"PRAGMA \"{db}\".INDEX_INFO({dbIndex[1]})");
+                            var dbIndexesSql = string.Concat(_orm.Ado.ExecuteScalar(CommandType.Text, $" SELECT sql FROM \"{db}\".sqlite_master WHERE name = '{dbIndex[1]}'"));
+                            foreach (var dbcolumn in dbIndexesColumns)
                             {
-                                string column = string.Concat(fk[3]);
-                                string fk_id = $"{db}.{table}.{fk[0]}";
-                                string ref_table_id = database.Length == 1 ? string.Concat(fk[2]) : $"{db}.{fk[2]}";
-                                string referenced_column = string.Concat(fk[4]);
+                                var column = string.Concat(dbcolumn[2]);
+                                var indexName = string.Concat(dbIndex[1]);
+                                var isDesc = dbIndexesSql.IndexOf($@"{column}"" DESC", StringComparison.CurrentCultureIgnoreCase) == -1 ? "0" : "1";
+                                var isUnique = string.Concat(dbIndex[2]);
+
                                 if (loc3.ContainsKey(table_id) == false || loc3[table_id].ContainsKey(column) == false) continue;
                                 var loc9 = loc3[table_id][column];
-                                if (loc2.ContainsKey(ref_table_id) == false) continue;
-                                var loc10 = loc2[ref_table_id];
-                                var loc11 = loc3[ref_table_id][referenced_column];
 
-                                Dictionary<string, DbForeignInfo> loc12 = null;
-                                DbForeignInfo loc13 = null;
-                                if (!fkColumns.TryGetValue(table_id, out loc12))
-                                    fkColumns.Add(table_id, loc12 = new Dictionary<string, DbForeignInfo>());
-                                if (!loc12.TryGetValue(fk_id, out loc13))
-                                    loc12.Add(fk_id, loc13 = new DbForeignInfo { Table = loc2[table_id], ReferencedTable = loc10 });
-                                loc13.Columns.Add(loc9);
-                                loc13.ReferencedColumns.Add(loc11);
+                                if (indexes.TryGetValue(indexName, out var indexInfo) == false)
+                                    indexes.Add(indexName, indexInfo = new DbIndexInfo
+                                    {
+                                        IsUnique = isUnique == "1",
+                                        Name = indexName
+                                    });
+                                if (indexInfo.Columns.Any(a => a.Column.Name == column) == false)
+                                    indexInfo.Columns.Add(new DbIndexColumnInfo
+                                    {
+                                        Column = loc9,
+                                        IsDesc = isDesc == "1"
+                                    });
                             }
-                            foreach (var table_id2 in fkColumns.Keys)
-                                foreach (var fk in fkColumns[table_id2])
-                                    loc2[table_id2].ForeignsDict.Add(fk.Key, fk.Value);
+                        }
+                        foreach (var indexItem in indexes)
+                        {
+                            if (indexItem.Value.IsUnique)
+                                loc2[table_id].UniquesDict.Add(indexItem.Key, indexItem.Value);
+                            else
+                                loc2[table_id].IndexesDict.Add(indexItem.Key, indexItem.Value);
+                        }
+
+                        if (tbname == null)
+                        {
+                            var fks = _orm.Ado.ExecuteArray(CommandType.Text, $"PRAGMA \"{db}\".foreign_key_list(\"{table}\")");
+                            if (fks != null && fks.Length > 0)
+                            {
+                                var fkColumns = new Dictionary<string, Dictionary<string, DbForeignInfo>>();
+                                foreach (var fk in fks)
+                                {
+                                    string column = string.Concat(fk[3]);
+                                    string fk_id = $"{db}.{table}.{fk[0]}";
+                                    string ref_table_id = database.Length == 1 ? string.Concat(fk[2]) : $"{db}.{fk[2]}";
+                                    string referenced_column = string.Concat(fk[4]);
+                                    if (loc3.ContainsKey(table_id) == false || loc3[table_id].ContainsKey(column) == false) continue;
+                                    var loc9 = loc3[table_id][column];
+                                    if (loc2.ContainsKey(ref_table_id) == false) continue;
+                                    var loc10 = loc2[ref_table_id];
+                                    var loc11 = loc3[ref_table_id][referenced_column];
+
+                                    Dictionary<string, DbForeignInfo> loc12 = null;
+                                    DbForeignInfo loc13 = null;
+                                    if (!fkColumns.TryGetValue(table_id, out loc12))
+                                        fkColumns.Add(table_id, loc12 = new Dictionary<string, DbForeignInfo>());
+                                    if (!loc12.TryGetValue(fk_id, out loc13))
+                                        loc12.Add(fk_id, loc13 = new DbForeignInfo { Table = loc2[table_id], ReferencedTable = loc10 });
+                                    loc13.Columns.Add(loc9);
+                                    loc13.ReferencedColumns.Add(loc11);
+                                }
+                                foreach (var table_id2 in fkColumns.Keys)
+                                    foreach (var fk in fkColumns[table_id2])
+                                        loc2[table_id2].ForeignsDict.Add(fk.Key, fk.Value);
+                            }
                         }
                     }
                 }

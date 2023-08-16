@@ -1,149 +1,107 @@
-﻿#if netcore
-
-using FreeSql.DataAnnotations;
+﻿using FreeSql.DataAnnotations;
 using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
-using System.Data;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Threading;
 
+// ReSharper disable CheckNamespace
+// ReSharper disable InconsistentNaming
+// ReSharper disable InconsistentlySynchronizedField
 namespace FreeSql
 {
     /// <summary>
+    /// Entity base class, including CreateTime/UpdateTime/IsDeleted.
+    /// <para></para>
     /// 包括 CreateTime/UpdateTime/IsDeleted 的实体基类
     /// </summary>
     [Table(DisableSyncStructure = true)]
     public abstract class BaseEntity
     {
-        internal static IFreeSql _ormPriv;
-        /// <summary>
-        /// 全局 IFreeSql orm 对象
-        /// </summary>
-        public static IFreeSql Orm => _ormPriv ?? throw new Exception(@"使用前请初始化 BaseEntity.Initialization(new FreeSqlBuilder()
-.UseAutoSyncStructure(true)
-.UseConnectionString(DataType.Sqlite, ""data source=test.db;max pool size=5"")
-.Build());");
+        static Func<IFreeSql> _resoleOrm;
+        internal static Func<IUnitOfWork> _resolveUow;
 
-        /// <summary>
-        /// 初始化BaseEntity
-        /// BaseEntity.Initialization(new FreeSqlBuilder()
-        /// <para></para>
-        /// .UseAutoSyncStructure(true)
-        /// <para></para>
-        /// .UseConnectionString(DataType.Sqlite, "data source=test.db;max pool size=5")
-        /// <para></para>
-        /// .Build());
-        /// </summary>
-        /// <param name="fsql">IFreeSql orm 对象</param>
-        public static void Initialization(IFreeSql fsql)
+        public static IFreeSql Orm => _resoleOrm?.Invoke() ?? throw new Exception(CoreStrings.S_BaseEntity_Initialization_Error);
+
+        public static void Initialization(IFreeSql fsql, Func<IUnitOfWork> resolveUow) => Initialization(() => fsql, resolveUow);
+        public static void Initialization(Func<IFreeSql> resoleOrm, Func<IUnitOfWork> resolveUow)
         {
-            _ormPriv = fsql;
-            _ormPriv.Aop.CurdBefore += (s, e) => Trace.WriteLine($"\r\n线程{Thread.CurrentThread.ManagedThreadId}: {e.Sql}\r\n");
+            _resoleOrm = resoleOrm;
+            _resolveUow = resolveUow;
+
             if (_configEntityQueues.Any())
             {
                 lock (_configEntityLock)
                 {
                     while (_configEntityQueues.TryDequeue(out var cei))
-                        _ormPriv.CodeFirst.ConfigEntity(cei.EntityType, cei.Fluent);
+                        Orm.CodeFirst.ConfigEntity(cei.EntityType, cei.Fluent);
                 }
             }
         }
-        
+
         class ConfigEntityInfo
         {
             public Type EntityType;
             public Action<TableFluent> Fluent;
         }
-        static ConcurrentQueue<ConfigEntityInfo> _configEntityQueues = new ConcurrentQueue<ConfigEntityInfo>();
-        static object _configEntityLock = new object();
+
+        static readonly ConcurrentQueue<ConfigEntityInfo> _configEntityQueues = new ConcurrentQueue<ConfigEntityInfo>();
+        static readonly object _configEntityLock = new object();
+
         internal static void ConfigEntity(Type entityType, Action<TableFluent> fluent)
         {
             lock (_configEntityLock)
             {
-                if (_ormPriv == null)
+                if (_resoleOrm?.Invoke() == null)
                     _configEntityQueues.Enqueue(new ConfigEntityInfo { EntityType = entityType, Fluent = fluent });
                 else
-                    _ormPriv.CodeFirst.ConfigEntity(entityType, fluent);
+                    Orm.CodeFirst.ConfigEntity(entityType, fluent);
             }
         }
 
         /// <summary>
+        /// Created time <br />
         /// 创建时间
         /// </summary>
         [Column(Position = -4)]
-        public DateTime CreateTime { get; set; } = DateTime.Now;
+        public virtual DateTime CreateTime { get; set; } = DateTime.Now;
+
         /// <summary>
+        /// Updated time <br />
         /// 更新时间
         /// </summary>
         [Column(Position = -3)]
-        public DateTime UpdateTime { get; set; }
+        public virtual DateTime UpdateTime { get; set; }
+
         /// <summary>
+        /// Logical Delete <br />
         /// 逻辑删除
         /// </summary>
         [Column(Position = -2)]
-        public bool IsDeleted { get; set; }
+        public virtual bool IsDeleted { get; set; }
+
         /// <summary>
+        /// Sort <br />
         /// 排序
         /// </summary>
         [Column(Position = -1)]
-        public int Sort { get; set; }
-
-        /// <summary>
-        /// 开启工作单元事务
-        /// </summary>
-        /// <returns></returns>
-        public static IUnitOfWork Begin() => Begin(null);
-        /// <summary>
-        /// 开启工作单元事务
-        /// </summary>
-        /// <param name="level">事务等级</param>
-        /// <returns></returns>
-        public static IUnitOfWork Begin(IsolationLevel? level)
-        {
-            var uow = Orm.CreateUnitOfWork();
-            uow.IsolationLevel = level;
-            CurrentUnitOfWork = uow;
-            return uow;
-        }
-
-        static readonly AsyncLocal<IUnitOfWork> _AsyncUnitOfWork = new AsyncLocal<IUnitOfWork>();
-        static readonly AsyncLocal<string> _AsyncTenantId = new AsyncLocal<string>();
-        /// <summary>
-        /// 获取或设置当前租户id
-        /// </summary>
-        public static string CurrentTenantId
-        {
-            get => _AsyncTenantId.Value;
-            set => _AsyncTenantId.Value = value;
-        }
-        /// <summary>
-        /// 获取或设置当前租户id
-        /// </summary>
-        public static IUnitOfWork CurrentUnitOfWork
-        {
-            get => _AsyncUnitOfWork.Value;
-            set => _AsyncUnitOfWork.Value = value;
-        }
+        public virtual int Sort { get; set; }
     }
 
     /// <summary>
-    /// 租户
+    /// A readonly entity base class, including CreateTime/UpdateTime/IsDeleted.
+    /// <para></para>
+    /// 包括 CreateTime/UpdateTime/IsDeleted 的只读实体基类
     /// </summary>
-    public interface ITenant
-    {
-        /// <summary>
-        /// 租户id
-        /// </summary>
-        string TenantId { get; set; }
-    }
-
+    /// <typeparam name="TEntity"></typeparam>
+    [Table(DisableSyncStructure = true)]
     public abstract class BaseEntityReadOnly<TEntity> : BaseEntity where TEntity : class
     {
         /// <summary>
+        /// To query data <br />
         /// 查询数据
         /// </summary>
         /// <returns></returns>
@@ -153,9 +111,7 @@ namespace FreeSql
             {
                 var select = Orm.Select<TEntity>()
                     .TrackToList(TrackToList) //自动为每个元素 Attach
-                    .WithTransaction(CurrentUnitOfWork?.GetOrBeginTransaction(false));
-                if (string.IsNullOrEmpty(CurrentTenantId) == false)
-                    select.WhereCascade(a => (a as ITenant).TenantId == CurrentTenantId);
+                    .WithTransaction(_resolveUow?.Invoke()?.GetOrBeginTransaction(false));
                 return select.WhereCascade(a => (a as BaseEntity).IsDeleted == false);
             }
         }
@@ -163,15 +119,20 @@ namespace FreeSql
         static void TrackToList(object list)
         {
             if (list == null) return;
+
             var ls = list as IList<TEntity>;
             if (ls == null)
             {
                 var ie = list as IEnumerable;
                 if (ie == null) return;
+
                 var isFirst = true;
+                IBaseRepository<TEntity> baseRepo = null;
+
                 foreach (var item in ie)
                 {
                     if (item == null) return;
+
                     if (isFirst)
                     {
                         isFirst = false;
@@ -179,40 +140,53 @@ namespace FreeSql
                         if (itemType == typeof(object)) return;
                         if (itemType.FullName.Contains("FreeSqlLazyEntity__")) itemType = itemType.BaseType;
                         if (Orm.CodeFirst.GetTableByEntity(itemType)?.Primarys.Any() != true) return;
+                        if (itemType.GetConstructor(Type.EmptyTypes) == null) return;
                         if (item is BaseEntity<TEntity> == false) return;
                     }
-                    (item as BaseEntity<TEntity>)?.Attach();
+
+                    if (item is BaseEntity<TEntity> entity)
+                    {
+                        if (baseRepo == null) baseRepo = Orm.GetRepository<TEntity>();
+                        entity.Repository = baseRepo;
+                        entity.Attach();
+                    }
                 }
                 return;
             }
+
             if (ls.Any() == false) return;
             if (ls.FirstOrDefault() is BaseEntity<TEntity> == false) return;
             if (Orm.CodeFirst.GetTableByEntity(typeof(TEntity))?.Primarys.Any() != true) return;
-            foreach (var item in ls)
-                (item as BaseEntity<TEntity>)?.Attach();
-        }
 
-        /// <summary>
-        /// 设置当前租户id
-        /// </summary>
-        protected void SetTenantId()
-        {
-            if (string.IsNullOrEmpty(CurrentTenantId) == false)
+            IBaseRepository<TEntity> repo = null;
+            foreach (var item in ls)
             {
-                var ten = this as ITenant;
-                if (ten != null)
-                    ten.TenantId = CurrentTenantId;
+                if (item is BaseEntity<TEntity> entity)
+                {
+                    if (repo == null) repo = Orm.GetRepository<TEntity>();
+                    entity.Repository = repo;
+                    entity.Attach();
+                }
             }
         }
 
         /// <summary>
-        /// 查询条件，Where(a => a.Id > 10)，支持导航对象查询，Where(a => a.Author.Email == "2881099@qq.com")
+        /// Query conditions <br />
+        /// 查询条件，Where(a => a.Id> 10)
+        /// <para></para>
+        /// Support navigation object query <br />
+        /// 支持导航对象查询，Where(a => a.Author.Email == "2881099@qq.com")
         /// </summary>
         /// <param name="exp">lambda表达式</param>
         /// <returns></returns>
         public static ISelect<TEntity> Where(Expression<Func<TEntity, bool>> exp) => Select.Where(exp);
+
         /// <summary>
-        /// 查询条件，Where(true, a => a.Id > 10)，支导航对象查询，Where(true, a => a.Author.Email == "2881099@qq.com")
+        /// Query conditions <br />
+        /// 查询条件，Where(true, a => a.Id > 10)
+        /// <para></para>
+        /// Support navigation object query <br />
+        /// 支导航对象查询，Where(true, a => a.Author.Email == "2881099@qq.com")
         /// </summary>
         /// <param name="condition">true 时生效</param>
         /// <param name="exp">lambda表达式</param>
@@ -220,24 +194,22 @@ namespace FreeSql
         public static ISelect<TEntity> WhereIf(bool condition, Expression<Func<TEntity, bool>> exp) => Select.WhereIf(condition, exp);
 
         /// <summary>
+        /// Repository object. <br />
         /// 仓储对象
         /// </summary>
         protected IBaseRepository<TEntity> Repository { get; set; }
 
         /// <summary>
-        /// 附加实体，在更新数据时，只更新变化的部分
+        /// To Attach entities. When updating data, only the changed part is updated. <br />
+        /// 附加实体。在更新数据时，只更新变化的部分
         /// </summary>
         public TEntity Attach()
         {
-            if (this.Repository == null)
-                this.Repository = Orm.GetRepository<TEntity>();
-
+            if (Repository == null) 
+                Repository = Orm.GetRepository<TEntity>();
             var item = this as TEntity;
-            this.SetTenantId();
-            this.Repository.Attach(item);
+            Repository.Attach(item);
             return item;
         }
     }
 }
-
-#endif

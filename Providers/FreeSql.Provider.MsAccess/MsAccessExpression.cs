@@ -19,6 +19,10 @@ namespace FreeSql.MsAccess
             Func<Expression, string> getExp = exparg => ExpressionLambdaToSql(exparg, tsc);
             switch (exp.NodeType)
             {
+                //case ExpressionType.ArrayLength:
+                //    var arrOper = (exp as UnaryExpression)?.Operand;
+                //    if (arrOper.Type == typeof(byte[])) return $"lenb({getExp(arrOper)})";  #505
+                //    break;
                 case ExpressionType.Convert:
                     var operandExp = (exp as UnaryExpression)?.Operand;
                     var gentype = exp.Type.NullableTypeOrThis();
@@ -56,7 +60,18 @@ namespace FreeSql.MsAccess
                             if (callExp.Method.DeclaringType.IsNumberType()) return "rnd";
                             return null;
                         case "ToString":
-                            if (callExp.Object != null) return callExp.Arguments.Count == 0 ? MsAccessUtils.GetCastSql(getExp(callExp.Object), typeof(string)) : null;
+                            if (callExp.Object != null)
+                            {
+                                if (callExp.Object.Type.NullableTypeOrThis().IsEnum)
+                                {
+                                    tsc.SetMapColumnTmp(null);
+                                    var oldMapType = tsc.SetMapTypeReturnOld(typeof(string));
+                                    var enumStr = ExpressionLambdaToSql(callExp.Object, tsc);
+                                    tsc.SetMapColumnTmp(null).SetMapTypeReturnOld(oldMapType);
+                                    return enumStr;
+                                }
+                                return callExp.Arguments.Count == 0 ? MsAccessUtils.GetCastSql(getExp(callExp.Object), typeof(string)) : null;
+                            }
                             return null;
                     }
 
@@ -70,6 +85,16 @@ namespace FreeSql.MsAccess
                         objExp = callExp.Arguments.FirstOrDefault();
                         objType = objExp?.Type;
                         argIndex++;
+
+                        if (objType == typeof(string))
+                        {
+                            switch (callExp.Method.Name)
+                            {
+                                case "First":
+                                case "FirstOrDefault":
+                                    return $"left({getExp(callExp.Arguments[0])}, 1)";
+                            }
+                        }
                     }
                     if (objType == null) objType = callExp.Method.DeclaringType;
                     if (objType != null || objType.IsArrayOrList())
@@ -78,10 +103,12 @@ namespace FreeSql.MsAccess
                         tsc.SetMapColumnTmp(null);
                         var args1 = getExp(callExp.Arguments[argIndex]);
                         var oldMapType = tsc.SetMapTypeReturnOld(tsc.mapTypeTmp);
-                        var oldDbParams = tsc.SetDbParamsReturnOld(null);
+                        var oldDbParams = objExp?.NodeType == ExpressionType.MemberAccess ? tsc.SetDbParamsReturnOld(null) : null; //#900 UseGenerateCommandParameterWithLambda(true) 子查询 bug、以及 #1173 参数化 bug
+                        tsc.isNotSetMapColumnTmp = true;
                         var left = objExp == null ? null : getExp(objExp);
+                        tsc.isNotSetMapColumnTmp = false;
                         tsc.SetMapColumnTmp(null).SetMapTypeReturnOld(oldMapType);
-                        tsc.SetDbParamsReturnOld(oldDbParams);
+                        if (oldDbParams != null) tsc.SetDbParamsReturnOld(oldDbParams);
                         switch (callExp.Method.Name)
                         {
                             case "Contains":
@@ -97,6 +124,7 @@ namespace FreeSql.MsAccess
                     for (var a = 0; a < arrExp.Expressions.Count; a++)
                     {
                         if (a > 0) arrSb.Append(",");
+                        if (a % 500 == 499) arrSb.Append("   \r\n    \r\n"); //500元素分割, 3空格\r\n4空格
                         arrSb.Append(getExp(arrExp.Expressions[a]));
                     }
                     if (arrSb.Length == 1) arrSb.Append("NULL");
@@ -219,7 +247,22 @@ namespace FreeSql.MsAccess
                         var arg2 = getExp(exp.Arguments[0]);
                         return $"({arg2} is null or {arg2} = '' or ltrim({arg2}) = '')";
                     case "Concat":
+                        if (exp.Arguments.Count == 1 && exp.Arguments[0].NodeType == ExpressionType.NewArrayInit && exp.Arguments[0] is NewArrayExpression concatNewArrExp)
+                            return _common.StringConcat(concatNewArrExp.Expressions.Select(a => getExp(a)).ToArray(), concatNewArrExp.Expressions.Select(a => a.Type).ToArray());
                         return _common.StringConcat(exp.Arguments.Select(a => getExp(a)).ToArray(), exp.Arguments.Select(a => a.Type).ToArray());
+                    case "Format":
+                        if (exp.Arguments[0].NodeType != ExpressionType.Constant) throw new Exception(CoreStrings.Not_Implemented_Expression_ParameterUseConstant(exp,exp.Arguments[0]));
+                        var expArgsHack = exp.Arguments.Count == 2 && exp.Arguments[1].NodeType == ExpressionType.NewArrayInit ?
+                            (exp.Arguments[1] as NewArrayExpression).Expressions : exp.Arguments.Where((a, z) => z > 0);
+                        //3个 {} 时，Arguments 解析出来是分开的
+                        //4个 {} 时，Arguments[1] 只能解析这个出来，然后里面是 NewArray []
+                        var expArgs = expArgsHack.Select(a =>
+                        {
+                            var asql = ((a as UnaryExpression)?.Operand.Type ?? a.Type) == typeof(string) ? $"{ExpressionLambdaToSql(a, tsc)}" : $"cstr({ExpressionLambdaToSql(a, tsc)})";
+                            return $"'+{_common.IsNull(asql, "''")}+'";
+                        }
+                        ).ToArray();
+                        return string.Format(ExpressionLambdaToSql(exp.Arguments[0], tsc), expArgs);
                 }
             }
             else
@@ -232,6 +275,12 @@ namespace FreeSql.MsAccess
                     case "Contains":
                         var args0Value = getExp(exp.Arguments[0]);
                         if (args0Value == "NULL") return $"({left}) IS NULL";
+                        if (args0Value.Contains("%"))
+                        {
+                            if (exp.Method.Name == "StartsWith") return $"instr({args0Value}, {left}) = 1";
+                            if (exp.Method.Name == "EndsWith") return $"instr({args0Value}, {left}) = len({args0Value})";
+                            return $"instr({args0Value}, {left}) > 0";
+                        }
                         if (exp.Method.Name == "StartsWith") return $"({left}) LIKE {(args0Value.EndsWith("'") ? args0Value.Insert(args0Value.Length - 1, "%") : $"({args0Value}+'%')")}";
                         if (exp.Method.Name == "EndsWith") return $"({left}) LIKE {(args0Value.StartsWith("'") ? args0Value.Insert(1, "%") : $"('%'+{args0Value})")}";
                         if (args0Value.StartsWith("'") && args0Value.EndsWith("'")) return $"({left}) LIKE {args0Value.Insert(1, "%").Insert(args0Value.Length, "%")}";
@@ -343,7 +392,7 @@ namespace FreeSql.MsAccess
                         break;
                     case "Equals": return $"({left} = {args1})";
                     case "CompareTo": return $"datediff('s',{args1},{left})";
-                    case "ToString": return exp.Arguments.Count == 0 ? $"format({left},'yyyy-mm-dd HH:mm:ss')" : null;
+                    case "ToString": return exp.Arguments.Count == 0 ? $"format({left},'yyyy-mm-dd HH:mm:ss')" : $"format({left},{args1})";
                 }
             }
             return null;

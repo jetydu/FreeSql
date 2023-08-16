@@ -1,4 +1,5 @@
-﻿using System;
+﻿using FreeSql.Internal.Model;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,6 +14,7 @@ namespace FreeSql.Extensions.EntityUtil
 
         static readonly MethodInfo MethodStringBuilderAppend = typeof(StringBuilder).GetMethod("Append", new Type[] { typeof(object) });
         static readonly MethodInfo MethodStringBuilderToString = typeof(StringBuilder).GetMethod("ToString", new Type[0]);
+        static readonly MethodInfo MethodDecimalToString = typeof(decimal).GetMethod("ToString", new[] { typeof(string) });
         static readonly PropertyInfo MethodStringBuilderLength = typeof(StringBuilder).GetProperty("Length");
         static readonly MethodInfo MethodStringConcat = typeof(string).GetMethod("Concat", new Type[] { typeof(object) });
         static readonly MethodInfo MethodFreeUtilNewMongodbId = typeof(FreeUtil).GetMethod("NewMongodbId");
@@ -27,7 +29,6 @@ namespace FreeSql.Extensions.EntityUtil
         /// <param name="genGuid">当Guid无值时，会生成有序的新值</param>
         /// <param name="splitString"></param>
         /// <returns></returns>
-        //public static string GetEntityKeyString<TEntity>(this IFreeSql orm, TEntity entity, string splitString = "*|_,[,_|*") => GetEntityKeyString(orm, typeof(TEntity), entity, splitString);
         public static string GetEntityKeyString(this IFreeSql orm, Type entityType, object entity, bool genGuid, string splitString = "*|_,[,_|*")
         {
             if (entity == null) return null;
@@ -59,11 +60,11 @@ namespace FreeSql.Extensions.EntityUtil
                         if (pks[a].CsType == typeof(Guid?)) newguid = Expression.Convert(newguid, typeof(Guid?));
                         expthen = Expression.Block(
                             new Expression[]{
-                            Expression.Assign(Expression.MakeMemberAccess(var1Parm, _table.Properties[pks[a].CsName]), newguid),
-                            a > 0 ? Expression.Call(var2Sb, MethodStringBuilderAppend, Expression.Constant(splitString)) : null,
-                            Expression.Call(var2Sb, MethodStringBuilderAppend,
-                                Expression.Convert(Expression.MakeMemberAccess(var1Parm, _table.Properties[pks[a].CsName]), typeof(object))
-                            )
+                                Expression.Assign(Expression.MakeMemberAccess(var1Parm, _table.Properties[pks[a].CsName]), newguid),
+                                a > 0 ? Expression.Call(var2Sb, MethodStringBuilderAppend, Expression.Constant(splitString)) : null,
+                                Expression.Call(var2Sb, MethodStringBuilderAppend,
+                                    Expression.Convert(Expression.MakeMemberAccess(var1Parm, _table.Properties[pks[a].CsName]), typeof(object))
+                                )
                             }.Where(c => c != null).ToArray()
                         );
                     }
@@ -82,6 +83,34 @@ namespace FreeSql.Extensions.EntityUtil
                     {
                         expthen = Expression.Assign(var3IsNull, Expression.Constant(true));
                     }
+                    Expression propExp = Expression.MakeMemberAccess(var1Parm, _table.Properties[pks[a].CsName]);
+                    var blockExps = new List<Expression>();
+                    if (a > 0) blockExps.Add(Expression.Call(var2Sb, MethodStringBuilderAppend, Expression.Constant(splitString)));
+                    if (pks[a].CsType == typeof(decimal))
+                    {
+                        blockExps.Add(
+                            Expression.Call(var2Sb, MethodStringBuilderAppend, Expression.Convert(
+                                Expression.Call(propExp, MethodDecimalToString, Expression.Constant("g0", typeof(string)))
+                            , typeof(object)))
+                        );
+                    }
+                    else if (pks[a].CsType == typeof(decimal?))
+                    {
+                        blockExps.Add(
+                            Expression.IfThen(
+                                Expression.NotEqual(propExp, Expression.Default(pks[a].CsType)),
+                                Expression.Call(var2Sb, MethodStringBuilderAppend, Expression.Convert(
+                                    Expression.Call(Expression.Convert(propExp, typeof(decimal)), MethodDecimalToString, Expression.Constant("g0", typeof(string)))
+                                , typeof(object)))
+                            )
+                        );
+                    }
+                    else
+                    {
+                        blockExps.Add(
+                            Expression.Call(var2Sb, MethodStringBuilderAppend, Expression.Convert(propExp, typeof(object)))
+                        );
+                    }
                     if (pks[a].Attribute.IsIdentity || isguid || pks[a].CsType == typeof(string) || pks[a].CsType.IsNullableType())
                     {
                         exps.Add(
@@ -93,14 +122,7 @@ namespace FreeSql.Extensions.EntityUtil
                                         Expression.IsTrue(parm2),
                                         expthen
                                     ),
-                                    Expression.Block(
-                                        new Expression[]{
-                                            a > 0 ? Expression.Call(var2Sb, MethodStringBuilderAppend, Expression.Constant(splitString)) : null,
-                                            Expression.Call(var2Sb, MethodStringBuilderAppend,
-                                                Expression.Convert(Expression.MakeMemberAccess(var1Parm, _table.Properties[pks[a].CsName]), typeof(object))
-                                            )
-                                        }.Where(c => c != null).ToArray()
-                                    )
+                                    Expression.Block(blockExps.ToArray())
                                 )
                             )
                         );
@@ -110,14 +132,7 @@ namespace FreeSql.Extensions.EntityUtil
                         exps.Add(
                             Expression.IfThen(
                                 Expression.IsFalse(var3IsNull),
-                                Expression.Block(
-                                    new Expression[]{
-                                        a > 0 ? Expression.Call(var2Sb, MethodStringBuilderAppend, Expression.Constant(splitString)) : null,
-                                        Expression.Call(var2Sb, MethodStringBuilderAppend,
-                                            Expression.Convert(Expression.MakeMemberAccess(var1Parm, _table.Properties[pks[a].CsName]), typeof(object))
-                                        )
-                                    }.Where(c => c != null).ToArray()
-                                )
+                                Expression.Block(blockExps.ToArray())
                             )
                         );
                     }
@@ -141,7 +156,6 @@ namespace FreeSql.Extensions.EntityUtil
         /// <param name="entityType"></param>
         /// <param name="entity"></param>
         /// <returns></returns>
-        //public static object[] GetEntityKeyValues<TEntity>(this IFreeSql orm, TEntity entity) => GetEntityKeyValues(orm, typeof(TEntity), entity);
         public static object[] GetEntityKeyValues(this IFreeSql orm, Type entityType, object entity)
         {
             if (entity == null) return null;
@@ -184,7 +198,6 @@ namespace FreeSql.Extensions.EntityUtil
         /// <param name="entity"></param>
         /// <param name="propertyName"></param>
         /// <returns></returns>
-        //public static object GetEntityValueWithPropertyName<TEntity>(this IFreeSql orm, TEntity entity, string propertyName) => GetEntityKeyValues(orm, typeof(TEntity), entity, propertyName);
         public static object GetEntityValueWithPropertyName(this IFreeSql orm, Type entityType, object entity, string propertyName)
         {
             if (entity == null) return null;
@@ -194,19 +207,47 @@ namespace FreeSql.Extensions.EntityUtil
                 .GetOrAdd(entityType, et => new ConcurrentDictionary<string, Func<object, object>>())
                 .GetOrAdd(propertyName, pn =>
                 {
-                    var _table = orm.CodeFirst.GetTableByEntity(entityType);
-                    var pks = _table.Primarys;
+                    var table = orm.CodeFirst.GetTableByEntity(entityType);
+                    var pks = table.Primarys;
                     var returnTarget = Expression.Label(typeof(object));
                     var parm1 = Expression.Parameter(typeof(object));
                     var var1Parm = Expression.Variable(entityType);
                     var var2Ret = Expression.Variable(typeof(object));
                     var exps = new List<Expression>(new Expression[] {
-                    Expression.Assign(var1Parm, Expression.TypeAs(parm1, entityType)),
-                    Expression.Assign(
-                        var2Ret,
-                        Expression.Convert(Expression.MakeMemberAccess(var1Parm, _table.Properties[pn]), typeof(object))
-                    )
+                        Expression.Assign(var1Parm, Expression.TypeAs(parm1, entityType)),
+                        Expression.Assign(
+                            var2Ret,
+                            Expression.Convert(Expression.MakeMemberAccess(var1Parm, table.Properties[pn]), typeof(object))
+                        )
+                    });
+                    exps.AddRange(new Expression[] {
+                    Expression.Return(returnTarget, var2Ret),
+                    Expression.Label(returnTarget, Expression.Default(typeof(object)))
                 });
+                    return Expression.Lambda<Func<object, object>>(Expression.Block(new[] { var1Parm, var2Ret }, exps), new[] { parm1 }).Compile();
+                });
+            return func(entity);
+        }
+        public static object GetPropertyValue(this TableInfo table, object entity, string propertyName)
+        {
+            if (table == null || entity == null) return null;
+            var func = _dicGetEntityValueWithPropertyName
+                .GetOrAdd(DataType.MsAccess, dt => new ConcurrentDictionary<Type, ConcurrentDictionary<string, Func<object, object>>>())
+                .GetOrAdd(table.Type, et => new ConcurrentDictionary<string, Func<object, object>>())
+                .GetOrAdd(propertyName, pn =>
+                {
+                    var pks = table.Primarys;
+                    var returnTarget = Expression.Label(typeof(object));
+                    var parm1 = Expression.Parameter(typeof(object));
+                    var var1Parm = Expression.Variable(table.Type);
+                    var var2Ret = Expression.Variable(typeof(object));
+                    var exps = new List<Expression>(new Expression[] {
+                        Expression.Assign(var1Parm, Expression.TypeAs(parm1, table.Type)),
+                        Expression.Assign(
+                            var2Ret,
+                            Expression.Convert(Expression.MakeMemberAccess(var1Parm, table.Properties[pn]), typeof(object))
+                        )
+                    });
                     exps.AddRange(new Expression[] {
                     Expression.Return(returnTarget, var2Ret),
                     Expression.Label(returnTarget, Expression.Default(typeof(object)))
@@ -223,7 +264,6 @@ namespace FreeSql.Extensions.EntityUtil
         /// <param name="entityType"></param>
         /// <param name="entity"></param>
         /// <returns></returns>
-        //public static string GetEntityString<TEntity>(this IFreeSql orm, TEntity entity) => GetEntityString(orm, typeof(TEntity), entity);
         public static string GetEntityString(this IFreeSql orm, Type entityType, object entity)
         {
             if (entity == null) return null;
@@ -270,7 +310,6 @@ namespace FreeSql.Extensions.EntityUtil
         /// 使用新实体的值，复盖旧实体的值
         /// </summary>
         static ConcurrentDictionary<DataType, ConcurrentDictionary<Type, Action<object, object>>> _dicMapEntityValue = new ConcurrentDictionary<DataType, ConcurrentDictionary<Type, Action<object, object>>>();
-        //public static void MapEntityValue<TEntity>(this IFreeSql orm, TEntity entityFrom, TEntity entityTo) => MapEntityValue(orm, typeof(TEntity), entityFrom, entityTo);
         public static void MapEntityValue(this IFreeSql orm, Type entityType, object entityFrom, object entityTo)
         {
             if (entityType == null) entityType = entityFrom?.GetType() ?? entityTo?.GetType();
@@ -316,7 +355,6 @@ namespace FreeSql.Extensions.EntityUtil
         /// <summary>
         /// 使用新实体的主键值，复盖旧实体的主键值
         /// </summary>
-        //public static void MapEntityKeyValue<TEntity>(this IFreeSql orm, TEntity entityFrom, TEntity entityTo) => MapEntityKeyValue(orm, typeof(TEntity), entityFrom, entityTo);
         public static void MapEntityKeyValue(this IFreeSql orm, Type entityType, object entityFrom, object entityTo)
         {
             if (entityType == null) entityType = entityFrom?.GetType() ?? entityTo?.GetType();
@@ -354,7 +392,6 @@ namespace FreeSql.Extensions.EntityUtil
         /// <param name="entityType"></param>
         /// <param name="entity"></param>
         /// <param name="idtval"></param>
-        //public static void SetEntityIdentityValueWithPrimary<TEntity>(this IFreeSql orm, TEntity entity, long idtval) => SetEntityIdentityValueWithPrimary(orm, typeof(TEntity), entity, idtval);
         public static void SetEntityIdentityValueWithPrimary(this IFreeSql orm, Type entityType, object entity, long idtval)
         {
             if (entity == null) return;
@@ -390,7 +427,6 @@ namespace FreeSql.Extensions.EntityUtil
         /// <param name="orm"></param>
         /// <param name="entityType"></param>
         /// <param name="entity"></param>
-        //public static long GetEntityIdentityValueWithPrimary<TEntity>(this IFreeSql orm, TEntity entity) => GetEntityIdentityValueWithPrimary(orm, typeof(TEntity), entity);
         public static long GetEntityIdentityValueWithPrimary(this IFreeSql orm, Type entityType, object entity)
         {
             if (entity == null) return 0;
@@ -440,7 +476,6 @@ namespace FreeSql.Extensions.EntityUtil
         /// <param name="orm"></param>
         /// <param name="entityType"></param>
         /// <param name="entity"></param>
-        //public static void ClearEntityPrimaryValueWithIdentityAndGuid<TEntity>(this IFreeSql orm, TEntity entity) => ClearEntityPrimaryValueWithIdentityAndGuid(orm, typeof(TEntity), entity);
         public static void ClearEntityPrimaryValueWithIdentityAndGuid(this IFreeSql orm, Type entityType, object entity)
         {
             if (entity == null) return;
@@ -489,7 +524,6 @@ namespace FreeSql.Extensions.EntityUtil
         /// <param name="orm"></param>
         /// <param name="entityType"></param>
         /// <param name="entity"></param>
-        //public static void ClearEntityPrimaryValueWithIdentity<TEntity>(this IFreeSql orm, TEntity entity) => ClearEntityPrimaryValueWithIdentity(orm, typeof(TEntity), entity);
         public static void ClearEntityPrimaryValueWithIdentity(this IFreeSql orm, Type entityType, object entity)
         {
             if (entity == null) return;
@@ -530,7 +564,6 @@ namespace FreeSql.Extensions.EntityUtil
         /// <param name="entity2"></param>
         /// <param name="isEqual"></param>
         /// <returns></returns>
-        //public static string[] CompareEntityValueReturnColumns<TEntity>(this IFreeSql orm, TEntity entity1, TEntity entity2, bool isEqual) => CompareEntityValueReturnColumns(orm, typeof(TEntity), entity1, entity2, isEqual);
         public static string[] CompareEntityValueReturnColumns(this IFreeSql orm, Type entityType, object entity1, object entity2, bool isEqual)
         {
             if (entityType == null) entityType = entity1?.GetType() ?? entity2?.GetType();
@@ -586,7 +619,15 @@ namespace FreeSql.Extensions.EntityUtil
                 exps.Add(Expression.Label(returnTarget, Expression.Constant(new string[0])));
                 return Expression.Lambda<Func<object, object, bool, string[]>>(Expression.Block(new[] { var1Ret, var1Parm, var2Parm }, exps), new[] { parm1, parm2, parm3 }).Compile();
             });
-            return func(entity1, entity2, isEqual);
+            var result = func(entity1, entity2, isEqual);
+            var tmptb = orm.CodeFirst.GetTableByEntity(entityType);
+            if (tmptb.ColumnsByCanUpdateDbUpdateValue.Length > 0) {
+                if (isEqual && result.Length + tmptb.ColumnsByCanUpdateDbUpdateValue.Length == tmptb.ColumnsByCs.Count)
+                    return result.Concat(tmptb.ColumnsByCanUpdateDbUpdateValue.Select(a => a.Attribute.Name)).ToArray();
+                if (!isEqual && result.Length == tmptb.ColumnsByCanUpdateDbUpdateValue.Length)
+                    return new string[0];
+            }
+            return result;
         }
 
         static ConcurrentDictionary<DataType, ConcurrentDictionary<Type, Action<object, string, int>>> _dicSetEntityIncrByWithPropertyName = new ConcurrentDictionary<DataType, ConcurrentDictionary<Type, Action<object, string, int>>>();
@@ -598,7 +639,6 @@ namespace FreeSql.Extensions.EntityUtil
         /// <param name="entity"></param>
         /// <param name="propertyName"></param>
         /// <param name="incrBy"></param>
-        //public static void SetEntityIncrByWithPropertyName<TEntity>(this IFreeSql orm, TEntity entity, string propertyName, int incrBy) => SetEntityIncrByWithPropertyName(orm, typeof(TEntity), entity, propertyName, incrBy);
         public static void SetEntityIncrByWithPropertyName(this IFreeSql orm, Type entityType, object entity, string propertyName, int incrBy)
         {
             if (entity == null) return;
@@ -643,7 +683,6 @@ namespace FreeSql.Extensions.EntityUtil
         /// <param name="entity"></param>
         /// <param name="propertyName"></param>
         /// <param name="value"></param>
-        //public static void SetEntityValueWithPropertyName<TEntity>(this IFreeSql orm, TEntity entity, string propertyName, object value) => SetEntityValueWithPropertyName(orm, typeof(TEntity), entity, propertyName, value);
         public static void SetEntityValueWithPropertyName(this IFreeSql orm, Type entityType, object entity, string propertyName, object value)
         {
             if (entity == null) return;
@@ -666,6 +705,53 @@ namespace FreeSql.Extensions.EntityUtil
                         var prop = _table.Properties[pn];
 
                         if (_table.ColumnsByCs.ContainsKey(pn))
+                        {
+                            exps.Add(
+                                Expression.Assign(
+                                    Expression.MakeMemberAccess(var1Parm, prop),
+                                    Expression.Convert(
+                                        FreeSql.Internal.Utils.GetDataReaderValueBlockExpression(prop.PropertyType, parm3),
+                                        prop.PropertyType
+                                    )
+                                )
+                            );
+                        }
+                        else
+                        {
+                            exps.Add(
+                                Expression.Assign(
+                                    Expression.MakeMemberAccess(var1Parm, prop),
+                                    Expression.Convert(
+                                        parm3,
+                                        prop.PropertyType
+                                    )
+                                )
+                            );
+                        }
+                    }
+                    return Expression.Lambda<Action<object, string, object>>(Expression.Block(new[] { var1Parm }, exps), new[] { parm1, parm2, parm3 }).Compile();
+                });
+            func(entity, propertyName, value);
+        }
+        public static void SetPropertyValue(this TableInfo table, object entity, string propertyName, object value)
+        {
+            if (table == null || entity == null) return;
+            var func = _dicSetEntityValueWithPropertyName.GetOrAdd(DataType.MsAccess, dt => new ConcurrentDictionary<Type, ConcurrentDictionary<string, Action<object, string, object>>>())
+                .GetOrAdd(table.Type, et => new ConcurrentDictionary<string, Action<object, string, object>>())
+                .GetOrAdd(propertyName, pn =>
+                {
+                    var parm1 = Expression.Parameter(typeof(object));
+                    var parm2 = Expression.Parameter(typeof(string));
+                    var parm3 = Expression.Parameter(typeof(object));
+                    var var1Parm = Expression.Variable(table.Type);
+                    var exps = new List<Expression>(new Expression[] {
+                        Expression.Assign(var1Parm, Expression.TypeAs(parm1, table.Type))
+                    });
+                    if (table.Properties.ContainsKey(pn))
+                    {
+                        var prop = table.Properties[pn];
+
+                        if (table.ColumnsByCs.ContainsKey(pn))
                         {
                             exps.Add(
                                 Expression.Assign(

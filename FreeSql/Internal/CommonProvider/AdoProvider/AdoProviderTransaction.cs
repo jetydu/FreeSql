@@ -35,7 +35,7 @@ namespace FreeSql.Internal.CommonProvider
         public DbTransaction TransactionCurrentThread => _trans.TryGetValue(Thread.CurrentThread.ManagedThreadId, out var conn) && conn.Transaction?.Connection != null ? conn.Transaction : null;
         public Aop.TraceBeforeEventArgs TransactionCurrentThreadAopBefore => _trans.TryGetValue(Thread.CurrentThread.ManagedThreadId, out var conn) && conn.Transaction?.Connection != null ? conn.AopBefore : null;
 
-        public void BeginTransaction(TimeSpan timeout, IsolationLevel? isolationLevel)
+        public void BeginTransaction(IsolationLevel? isolationLevel)
         {
             if (TransactionCurrentThread != null) return;
 
@@ -48,16 +48,16 @@ namespace FreeSql.Internal.CommonProvider
             try
             {
                 conn = MasterPool.Get();
-                tran = new Transaction2(conn, isolationLevel == null ? conn.Value.BeginTransaction() : conn.Value.BeginTransaction(isolationLevel.Value), timeout);
+                tran = new Transaction2(conn, isolationLevel == null ? conn.Value.BeginTransaction() : conn.Value.BeginTransaction(isolationLevel.Value), TimeSpan.FromSeconds(60));
                 tran.AopBefore = before;
             }
             catch (Exception ex)
             {
-                Trace.WriteLine($"数据库出错（开启事务）{ex.Message} \r\n{ex.StackTrace}");
+                //Trace.WriteLine($"数据库出错（开启事务）{ex.Message} \r\n{ex.StackTrace}");
                 MasterPool.Return(conn);
                 var after = new Aop.TraceAfterEventArgs(before, "", ex);
                 _util?._orm?.Aop.TraceAfterHandler?.Invoke(this, after);
-                throw ex;
+                throw;
             }
             if (_trans.ContainsKey(tid)) CommitTransaction();
             _trans.TryAdd(tid, tran);
@@ -65,29 +65,33 @@ namespace FreeSql.Internal.CommonProvider
 
         private void CommitTimeoutTransaction()
         {
-            if (_trans.Count > 0)
-            {
-                var trans = _trans.Values.Where(st2 => DateTime.Now.Subtract(st2.RunTime) > st2.Timeout).ToArray();
-                foreach (var tran in trans) CommitTransaction(true, tran, null, "Timeout自动提交");
-            }
+            //关闭 fsql.Transaction 线程事务自动提交机制 https://github.com/dotnetcore/FreeSql/issues/323
+            //if (_trans.Count > 0)
+            //{
+            //    var trans = _trans.Values.Where(st2 => DateTime.Now.Subtract(st2.RunTime) > st2.Timeout).ToArray();
+            //    foreach (var tran in trans) CommitTransaction(true, tran, null, "Timeout自动提交");
+            //}
         }
         private void CommitTransaction(bool isCommit, Transaction2 tran, Exception rollbackException, string remark = null)
         {
-            if (tran == null || tran.Transaction == null || tran.Transaction.Connection == null) return;
+            if (tran == null || tran.Transaction == null || tran.Connection == null) return;
             _trans.TryRemove(tran.Connection.LastGetThreadId, out var oldtran);
 
             Exception ex = null;
-            if (string.IsNullOrEmpty(remark)) remark = isCommit ? "提交" : "回滚";
+            if (string.IsNullOrEmpty(remark)) remark = isCommit ? CoreStrings.Commit : CoreStrings.RollBack;
             try
             {
-                Trace.WriteLine($"线程{tran.Connection.LastGetThreadId}事务{remark}");
-                if (isCommit) tran.Transaction.Commit();
-                else tran.Transaction.Rollback();
+                if (tran.Transaction.Connection != null) //用户自行 Commit、Rollback
+                {
+                    //Trace.WriteLine($"线程{tran.Connection.LastGetThreadId}事务{remark}");
+                    if (isCommit) tran.Transaction.Commit();
+                    else tran.Transaction.Rollback();
+                }
             }
             catch (Exception ex2)
             {
                 ex = ex2;
-                Trace.WriteLine($"数据库出错（{remark}事务）：{ex.Message} {ex.StackTrace}");
+                //Trace.WriteLine($"数据库出错（{remark}事务）：{ex.Message} {ex.StackTrace}");
             }
             finally
             {
@@ -106,22 +110,22 @@ namespace FreeSql.Internal.CommonProvider
             if (_trans.TryGetValue(Thread.CurrentThread.ManagedThreadId, out var tran)) CommitTransaction(false, tran, ex);
         }
 
-        public void Transaction(Action handler) => TransactionInternal(null, TimeSpan.FromSeconds(60), handler);
-        public void Transaction(TimeSpan timeout, Action handler) => TransactionInternal(null, timeout, handler);
-        public void Transaction(IsolationLevel isolationLevel, TimeSpan timeout, Action handler) => TransactionInternal(isolationLevel, timeout, handler);
+        public void Transaction(Action handler) => TransactionInternal(null, handler);
+        public void Transaction(IsolationLevel isolationLevel, Action handler) => TransactionInternal(isolationLevel, handler);
 
-        void TransactionInternal(IsolationLevel? isolationLevel, TimeSpan timeout, Action handler)
+        void TransactionInternal(IsolationLevel? isolationLevel, Action handler)
         {
+            var requireTran = TransactionCurrentThread == null;
             try
             {
-                BeginTransaction(timeout, isolationLevel);
+                if (requireTran) BeginTransaction(isolationLevel);
                 handler();
-                CommitTransaction();
+                if (requireTran) CommitTransaction();
             }
             catch (Exception ex)
             {
-                RollbackTransaction(ex);
-                throw ex;
+                if (requireTran) RollbackTransaction(ex);
+                throw;
             }
         }
 
@@ -129,11 +133,12 @@ namespace FreeSql.Internal.CommonProvider
         int _disposeCounter;
         public void Dispose()
         {
+            if (ResolveTransaction != null) return;
             if (Interlocked.Increment(ref _disposeCounter) != 1) return;
             try
             {
-                var trans = _trans.Values.ToArray();
-                foreach (var tran in trans) CommitTransaction(false, tran, null, "Dispose自动提交");
+                var trans = _trans?.Values.ToArray();
+                if (trans != null) foreach (var tran in trans) CommitTransaction(false, tran, null, "Dispose自动提交");
             }
             catch { }
 
@@ -142,8 +147,8 @@ namespace FreeSql.Internal.CommonProvider
             {
                 try
                 {
-                    pools = SlavePools.ToArray();
-                    SlavePools.Clear();
+                    pools = SlavePools?.ToArray();
+                    SlavePools?.Clear();
                     break;
                 }
                 catch
@@ -154,10 +159,10 @@ namespace FreeSql.Internal.CommonProvider
             {
                 foreach (var pool in pools)
                 {
-                    try { pool.Dispose(); } catch { }
+                    try { pool?.Dispose(); } catch { }
                 }
             }
-            try { MasterPool.Dispose(); } catch { }
+            try { MasterPool?.Dispose(); } catch { }
         }
     }
 }

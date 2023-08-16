@@ -1,11 +1,10 @@
 ﻿using FreeSql.Internal;
-using FreeSql.Internal.Model;
 using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace FreeSql.Dameng
 {
@@ -19,6 +18,10 @@ namespace FreeSql.Dameng
             Func<Expression, string> getExp = exparg => ExpressionLambdaToSql(exparg, tsc);
             switch (exp.NodeType)
             {
+                case ExpressionType.ArrayLength:
+                    var arrOper = (exp as UnaryExpression)?.Operand;
+                    if (arrOper.Type == typeof(byte[])) return $"lengthb({getExp(arrOper)})";
+                    break;
                 case ExpressionType.Convert:
                     var operandExp = (exp as UnaryExpression)?.Operand;
                     var gentype = exp.Type.NullableTypeOrThis();
@@ -78,7 +81,7 @@ namespace FreeSql.Dameng
                         case "NewGuid":
                             return null;
                         case "Next":
-                            if (callExp.Object?.Type == typeof(Random)) return "cast(dbms_random.value*1000000000 as smallint)";
+                            if (callExp.Object?.Type == typeof(Random)) return "cast(dbms_random.value*1000000000 as number)";
                             return null;
                         case "NextDouble":
                             if (callExp.Object?.Type == typeof(Random)) return "dbms_random.value";
@@ -87,7 +90,18 @@ namespace FreeSql.Dameng
                             if (callExp.Method.DeclaringType.IsNumberType()) return "dbms_random.value";
                             return null;
                         case "ToString":
-                            if (callExp.Object != null) return callExp.Arguments.Count == 0 ? $"to_char({getExp(callExp.Object)})" : null;
+                            if (callExp.Object != null)
+                            {
+                                if (callExp.Object.Type.NullableTypeOrThis().IsEnum)
+                                {
+                                    tsc.SetMapColumnTmp(null);
+                                    var oldMapType = tsc.SetMapTypeReturnOld(typeof(string));
+                                    var enumStr = ExpressionLambdaToSql(callExp.Object, tsc);
+                                    tsc.SetMapColumnTmp(null).SetMapTypeReturnOld(oldMapType);
+                                    return enumStr;
+                                }
+                                return callExp.Arguments.Count == 0 ? $"to_char({getExp(callExp.Object)})" : null;
+                            }
                             return null;
                     }
 
@@ -101,6 +115,16 @@ namespace FreeSql.Dameng
                         objExp = callExp.Arguments.FirstOrDefault();
                         objType = objExp?.Type;
                         argIndex++;
+
+                        if (objType == typeof(string))
+                        {
+                            switch (callExp.Method.Name)
+                            {
+                                case "First":
+                                case "FirstOrDefault":
+                                    return $"substr({getExp(callExp.Arguments[0])}, 1, 1)";
+                            }
+                        }
                     }
                     if (objType == null) objType = callExp.Method.DeclaringType;
                     if (objType != null || objType.IsArrayOrList())
@@ -109,10 +133,12 @@ namespace FreeSql.Dameng
                         tsc.SetMapColumnTmp(null);
                         var args1 = getExp(callExp.Arguments[argIndex]);
                         var oldMapType = tsc.SetMapTypeReturnOld(tsc.mapTypeTmp);
-                        var oldDbParams = tsc.SetDbParamsReturnOld(null);
+                        var oldDbParams = objExp?.NodeType == ExpressionType.MemberAccess ? tsc.SetDbParamsReturnOld(null) : null; //#900 UseGenerateCommandParameterWithLambda(true) 子查询 bug、以及 #1173 参数化 bug
+                        tsc.isNotSetMapColumnTmp = true;
                         var left = objExp == null ? null : getExp(objExp);
+                        tsc.isNotSetMapColumnTmp = false;
                         tsc.SetMapColumnTmp(null).SetMapTypeReturnOld(oldMapType);
-                        tsc.SetDbParamsReturnOld(oldDbParams);
+                        if (oldDbParams != null) tsc.SetDbParamsReturnOld(oldDbParams);
                         switch (callExp.Method.Name)
                         {
                             case "Contains":
@@ -128,6 +154,7 @@ namespace FreeSql.Dameng
                     for (var a = 0; a < arrExp.Expressions.Count; a++)
                     {
                         if (a > 0) arrSb.Append(",");
+                        if (a % 500 == 499) arrSb.Append("   \r\n    \r\n"); //500元素分割, 3空格\r\n4空格
                         arrSb.Append(getExp(arrExp.Expressions[a]));
                     }
                     if (arrSb.Length == 1) arrSb.Append("NULL");
@@ -193,7 +220,7 @@ namespace FreeSql.Dameng
             {
                 case "Date": return $"trunc({left})";
                 case "TimeOfDay": return $"(cast({left} as timestamp with time zone)-trunc({left}))";
-                case "DayOfWeek": return $"case when to_char({left})='7' then 0 else cast(to_char({left}) as number) end";
+                case "DayOfWeek": return $"case when to_char({left},'D')='7' then 0 else cast(to_char({left},'D') as number) end";
                 case "Day": return $"cast(to_char({left},'DD') as number)";
                 case "DayOfYear": return $"cast(to_char({left},'DDD') as number)";
                 case "Month": return $"cast(to_char({left},'MM') as number)";
@@ -223,7 +250,7 @@ namespace FreeSql.Dameng
             {
                 case "Days": return $"extract(day from {left})";
                 case "Hours": return $"extract(hour from {left})";
-                case "Milliseconds": return $"cast(substr(extract(second from {left})-floor(extract(second from {left})),2,3) as number)";
+                case "Milliseconds": return $"cast(substr(extract(second from {left})-floor(extract(second from {left})),3,3) as number)";
                 case "Minutes": return $"extract(minute from {left})";
                 case "Seconds": return $"floor(extract(second from {left}))";
                 case "Ticks": return $"(extract(day from {left})*86400+extract(hour from {left})*3600+extract(minute from {left})*60+extract(second from {left}))*10000000";
@@ -250,7 +277,31 @@ namespace FreeSql.Dameng
                         var arg2 = getExp(exp.Arguments[0]);
                         return $"({arg2} is null or {arg2} = '' or ltrim({arg2}) = '')";
                     case "Concat":
+                        if (exp.Arguments.Count == 1 && exp.Arguments[0].NodeType == ExpressionType.NewArrayInit && exp.Arguments[0] is NewArrayExpression concatNewArrExp)
+                            return _common.StringConcat(concatNewArrExp.Expressions.Select(a => getExp(a)).ToArray(), null);
                         return _common.StringConcat(exp.Arguments.Select(a => getExp(a)).ToArray(), null);
+                    case "Format":
+                        if (exp.Arguments[0].NodeType != ExpressionType.Constant) throw new Exception(CoreStrings.Not_Implemented_Expression_ParameterUseConstant(exp,exp.Arguments[0]));
+                        var expArgsHack = exp.Arguments.Count == 2 && exp.Arguments[1].NodeType == ExpressionType.NewArrayInit ?
+                            (exp.Arguments[1] as NewArrayExpression).Expressions : exp.Arguments.Where((a, z) => z > 0);
+                        //3个 {} 时，Arguments 解析出来是分开的
+                        //4个 {} 时，Arguments[1] 只能解析这个出来，然后里面是 NewArray []
+                        var expArgs = expArgsHack.Select(a => $"'||{_common.IsNull(ExpressionLambdaToSql(a, tsc), "''")}||'").ToArray();
+                        return string.Format(ExpressionLambdaToSql(exp.Arguments[0], tsc), expArgs);
+                    case "Join":
+                        if (exp.IsStringJoin(out var tolistObjectExp, out var toListMethod, out var toListArgs1))
+                        {
+                            var newToListArgs0 = Expression.Call(tolistObjectExp, toListMethod,
+                                Expression.Lambda(
+                                    Expression.Call(
+                                        typeof(SqlExtExtensions).GetMethod("StringJoinOracleGroupConcat"),
+                                        Expression.Convert(toListArgs1.Body, typeof(object)),
+                                        Expression.Convert(exp.Arguments[0], typeof(object))),
+                                    toListArgs1.Parameters));
+                            var newToListSql = getExp(newToListArgs0);
+                            return newToListSql;
+                        }
+                        break;
                 }
             }
             else
@@ -263,6 +314,12 @@ namespace FreeSql.Dameng
                     case "Contains":
                         var args0Value = getExp(exp.Arguments[0]);
                         if (args0Value == "NULL") return $"({left}) IS NULL";
+                        if (args0Value.Contains("%"))
+                        {
+                            if (exp.Method.Name == "StartsWith") return $"instr({args0Value}, {left}) = 1";
+                            if (exp.Method.Name == "EndsWith") return $"instr({args0Value}, {left}) = length({args0Value})";
+                            return $"instr({args0Value}, {left}) > 0";
+                        }
                         if (exp.Method.Name == "StartsWith") return $"({left}) LIKE {(args0Value.EndsWith("'") ? args0Value.Insert(args0Value.Length - 1, "%") : $"(to_char({args0Value})||'%')")}";
                         if (exp.Method.Name == "EndsWith") return $"({left}) LIKE {(args0Value.StartsWith("'") ? args0Value.Insert(1, "%") : $"('%'||to_char({args0Value}))")}";
                         if (args0Value.StartsWith("'") && args0Value.EndsWith("'")) return $"({left}) LIKE {args0Value.Insert(1, "%").Insert(args0Value.Length, "%")}";
@@ -361,7 +418,7 @@ namespace FreeSql.Dameng
                 switch (exp.Method.Name)
                 {
                     case "Compare": return $"extract(day from ({getExp(exp.Arguments[0])}-({getExp(exp.Arguments[1])})))";
-                    case "DaysInMonth": return $"cast(to_char(last_day(({getExp(exp.Arguments[0])})||'-'||({getExp(exp.Arguments[1])})||'-01'),'DD') as number)";
+                    case "DaysInMonth": return $"cast(to_char(last_day(to_date(({getExp(exp.Arguments[0])})||'-'||({getExp(exp.Arguments[1])})||'-01','yyyy-mm-dd')),'DD') as number)";
                     case "Equals": return $"({getExp(exp.Arguments[0])} = {getExp(exp.Arguments[1])})";
 
                     case "IsLeapYear":
@@ -398,7 +455,64 @@ namespace FreeSql.Dameng
                         break;
                     case "Equals": return $"({left} = {args1})";
                     case "CompareTo": return $"extract(day from ({left}-({args1})))";
-                    case "ToString": return exp.Arguments.Count == 0 ? $"to_char({left},'YYYY-MM-DD HH24:MI:SS.FF6')" : null;
+                    case "ToString":
+                        if (left.StartsWith("'") || left.EndsWith("'")) left = $"to_timestamp({left},'YYYY-MM-DD HH24:MI:SS.FF6')";
+                        if (exp.Arguments.Count == 0) return $"to_char({left},'YYYY-MM-DD HH24:MI:SS.FF6')";
+                        switch (args1)
+                        {
+                            case "'yyyy-MM-dd HH:mm:ss'": return $"to_char({left},'YYYY-MM-DD HH24:MI:SS')";
+                            case "'yyyy-MM-dd HH:mm'": return $"to_char({left},'YYYY-MM-DD HH24:MI')";
+                            case "'yyyy-MM-dd HH'": return $"to_char({left},'YYYY-MM-DD HH24')";
+                            case "'yyyy-MM-dd'": return $"to_char({left},'YYYY-MM-DD')";
+                            case "'yyyy-MM'": return $"to_char({left},'YYYY-MM')";
+                            case "'yyyyMMddHHmmss'": return $"to_char({left},'YYYYMMDDHH24MISS')";
+                            case "'yyyyMMddHHmm'": return $"to_char({left},'YYYYMMDDHH24MI')";
+                            case "'yyyyMMddHH'": return $"to_char({left},'YYYYMMDDHH24')";
+                            case "'yyyyMMdd'": return $"to_char({left},'YYYYMMDD')";
+                            case "'yyyyMM'": return $"to_char({left},'YYYYMM')";
+                            case "'yyyy'": return $"to_char({left},'YYYY')";
+                            case "'HH:mm:ss'": return $"to_char({left},'HH24:MI:SS')";
+                        }
+                        args1 = Regex.Replace(args1, "(yyyy|yy|MM|dd|HH|hh|mm|ss|tt)", m =>
+                        {
+                            switch (m.Groups[1].Value)
+                            {
+                                case "yyyy": return "YYYY";
+                                case "yy": return "YY";
+                                case "MM": return "%_a1";
+                                case "dd": return "%_a2";
+                                case "HH": return "%_a3";
+                                case "mm": return "%_a4";
+                                case "ss": return "SS";
+                                case "tt": return "%_a5";
+                            }
+                            return m.Groups[0].Value;
+                        });
+                        var argsFinds = new[] { "YYYY", "YY", "%_a1", "%_a2", "%_a3", "%_a4", "SS", "%_a5" };
+                        var argsSpts = Regex.Split(args1, "(M|d|H|hh|h|m|s|t)");
+                        for (var a = 0; a < argsSpts.Length; a++)
+                        {
+                            switch (argsSpts[a])
+                            {
+                                case "M": argsSpts[a] = $"ltrim(to_char({left},'MM'),'0')"; break;
+                                case "d": argsSpts[a] = $"case when substr(to_char({left},'DD'),1,1) = '0' then substr(to_char({left},'DD'),2,1) else to_char({left},'DD') end"; break;
+                                case "H": argsSpts[a] = $"case when substr(to_char({left},'HH24'),1,1) = '0' then substr(to_char({left},'HH24'),2,1) else to_char({left},'HH24') end"; break;
+                                case "hh": argsSpts[a] = $"case mod(cast(case when substr(to_char({left},'HH24'),1,1) = '0' then substr(to_char({left},'HH24'),2,1) else to_char({left},'HH24') end as number),12) when 0 then '12' when 1 then '01' when 2 then '02' when 3 then '03' when 4 then '04' when 5 then '05' when 6 then '06' when 7 then '07' when 8 then '08' when 9 then '09' when 10 then '10' when 11 then '11' end"; break;
+                                case "h": argsSpts[a] = $"case mod(cast(case when substr(to_char({left},'HH24'),1,1) = '0' then substr(to_char({left},'HH24'),2,1) else to_char({left},'HH24') end as number),12) when 0 then '12' when 1 then '1' when 2 then '2' when 3 then '3' when 4 then '4' when 5 then '5' when 6 then '6' when 7 then '7' when 8 then '8' when 9 then '9' when 10 then '10' when 11 then '11' end"; break;
+                                case "m": argsSpts[a] = $"case when substr(to_char({left},'MI'),1,1) = '0' then substr(to_char({left},'MI'),2,1) else to_char({left},'MI') end"; break;
+                                case "s": argsSpts[a] = $"case when substr(to_char({left},'SS'),1,1) = '0' then substr(to_char({left},'SS'),2,1) else to_char({left},'SS') end"; break;
+                                case "t": argsSpts[a] = $"rtrim(to_char({left},'AM'),'M')"; break;
+                                default:
+                                    var argsSptsA = argsSpts[a];
+                                    if (argsSptsA.StartsWith("'")) argsSptsA = argsSptsA.Substring(1);
+                                    if (argsSptsA.EndsWith("'")) argsSptsA = argsSptsA.Remove(argsSptsA.Length - 1);
+                                    argsSpts[a] = argsFinds.Any(m => argsSptsA.Contains(m)) ? $"to_char({left},'{argsSptsA}')" : $"'{argsSptsA}'";
+                                    break;
+                                    //达梦 to_char(to_timestamp('2020-02-01 00:00:00.000000','YYYY-MM-DD HH24:MI:SS.FF6'),' ') 无效
+                            }
+                        }
+                        if (argsSpts.Length > 0) args1 = $"({string.Join(" || ", argsSpts.Where(a => a != "''"))})";
+                        return args1.Replace("%_a1", "MM").Replace("%_a2", "DD").Replace("%_a3", "HH24").Replace("%_a4", "MI").Replace("%_a5", "AM");
                 }
             }
             return null;

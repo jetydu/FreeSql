@@ -1,4 +1,4 @@
-using FreeSql.DataAnnotations;
+﻿using FreeSql.DataAnnotations;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -86,22 +86,22 @@ namespace FreeSql.Tests.Odbc.PostgreSQL
             //SELECT a.`Id`, a.`Parent_id`, a.`Ddd`, a.`Name` 
             //FROM `Tag` a 
             //WHERE (exists(SELECT 1 
-            //	FROM `Tag` t 
-            //	LEFT JOIN `Tag` t__Parent ON t__Parent.`Id` = t.`Parent_id` 
-            //	WHERE (t__Parent.`Id` = 10) AND (t.`Parent_id` = a.`Id`) 
-            //	limit 0,1))
+            //    FROM `Tag` t 
+            //    LEFT JOIN `Tag` t__Parent ON t__Parent.`Id` = t.`Parent_id` 
+            //    WHERE (t__Parent.`Id` = 10) AND (t.`Parent_id` = a.`Id`) 
+            //    limit 0,1))
 
             //ManyToMany
             var t2 = g.pgsql.Select<Song>().Where(s => s.Tags.AsSelect().Any(t => t.Name == "国语")).ToSql();
             //SELECT a.`Id`, a.`Create_time`, a.`Is_deleted`, a.`Title`, a.`Url` 
             //FROM `Song` a
             //WHERE(exists(SELECT 1
-            //	FROM `Song_tag` Mt_Ms
-            //	WHERE(Mt_Ms.`Song_id` = a.`Id`) AND(exists(SELECT 1
-            //		FROM `Tag` t
-            //		WHERE(t.`Name` = '国语') AND(t.`Id` = Mt_Ms.`Tag_id`)
-            //		limit 0, 1))
-            //	limit 0, 1))
+            //    FROM `Song_tag` Mt_Ms
+            //    WHERE(Mt_Ms.`Song_id` = a.`Id`) AND(exists(SELECT 1
+            //        FROM `Tag` t
+            //        WHERE(t.`Name` = '国语') AND(t.`Id` = Mt_Ms.`Tag_id`)
+            //        limit 0, 1))
+            //    limit 0, 1))
         }
 
         [Fact]
@@ -128,7 +128,7 @@ namespace FreeSql.Tests.Odbc.PostgreSQL
 
             var dt1 = select.Limit(10).ToDataTable();
             var dt2 = select.Limit(10).ToDataTable("id, 222");
-            var dt3 = select.Limit(10).ToDataTable(a => new { a.Id, a.Type.Name, now = DateTime.Now });
+            var dt3 = select.Limit(10).ToDataTable(a => new { id = a.Id, name2 = a.Type.Name, now = DateTime.Now });
         }
         class TestDto
         {
@@ -189,9 +189,9 @@ namespace FreeSql.Tests.Odbc.PostgreSQL
             //);
 
             //var sql4 = select.From<TestTypeInfo, TestTypeParentInfo>((a, b, c) => new SelectFrom()
-            //	.InnerJoin(a.TypeGuid == b.Guid)
-            //	.LeftJoin(c.Id == b.ParentId)
-            //	.Where(b.Name == "xxx"))
+            //    .InnerJoin(a.TypeGuid == b.Guid)
+            //    .LeftJoin(c.Id == b.ParentId)
+            //    .Where(b.Name == "xxx"))
             //.Where(a => a.Id == 1).ToSql();
 
             var sql4 = select.From<TestTypeInfo, TestTypeParentInfo>((s, b, c) => s
@@ -270,7 +270,7 @@ namespace FreeSql.Tests.Odbc.PostgreSQL
 
             g.pgsql.Delete<District>().Where("1=1").ExecuteAffrows();
             var repo = g.pgsql.GetRepository<District>();
-            repo.DbContextOptions.EnableAddOrUpdateNavigateList = true;
+            repo.DbContextOptions.EnableCascadeSave = true;
             repo.Insert(new District
             {
                 Code = "001",
@@ -854,7 +854,7 @@ namespace FreeSql.Tests.Odbc.PostgreSQL
                 {
                     b.Key.Title,
                     b.Key.yyyy,
-
+                    b.Key,
                     cou = b.Count(),
                     sum2 = b.Sum(b.Value.TypeGuid)
                 });
@@ -879,6 +879,17 @@ namespace FreeSql.Tests.Odbc.PostgreSQL
         {
             var sql = select.OrderBy(a => new Random().NextDouble()).ToList();
         }
+        [Fact]
+        public void OrderByRandom()
+        {
+            var t1 = select.OrderByRandom().Limit(10).ToSql("1");
+            Assert.Equal(@"SELECT 1 
+FROM ""tb_topic"" a 
+ORDER BY random() 
+limit 10", t1);
+            var t2 = select.OrderByRandom().Limit(10).ToList();
+        }
+
         [Fact]
         public void Skip_Offset()
         {
@@ -915,9 +926,8 @@ namespace FreeSql.Tests.Odbc.PostgreSQL
                 all = a,
                 count = (long)select.As("b").Sum(b => b.Id)
             });
-            Assert.Equal(@"SELECT a.""id"" as1, a.""clicks"" as2, a.""typeguid"" as3, a.""title"" as4, a.""createtime"" as5, (SELECT sum(b.""id"") 
-	FROM ""tb_topic"" b 
-	limit 1) as6 
+            Assert.Equal(@"SELECT a.""id"" as1, a.""clicks"" as2, a.""typeguid"" as3, a.""title"" as4, a.""createtime"" as5, coalesce((SELECT sum(b.""id"") 
+    FROM ""tb_topic"" b), 0) as6 
 FROM ""tb_topic"" a", subquery);
             var subqueryList = select.ToList(a => new
             {
@@ -931,16 +941,18 @@ FROM ""tb_topic"" a", subquery);
             var subquery = select.ToSql(a => new
             {
                 all = a,
-                count = select.As("b").Min(b => b.Id)
+                min = select.As("b").Min(b => b.Id),
+                min2 = select.As("b").Min(b => b.CreateTime)
             });
-            Assert.Equal(@"SELECT a.""id"" as1, a.""clicks"" as2, a.""typeguid"" as3, a.""title"" as4, a.""createtime"" as5, (SELECT min(b.""id"") 
-	FROM ""tb_topic"" b 
-	limit 1) as6 
+            Assert.Equal(@"SELECT a.""id"" as1, a.""clicks"" as2, a.""typeguid"" as3, a.""title"" as4, a.""createtime"" as5, coalesce((SELECT min(b.""id"") 
+    FROM ""tb_topic"" b), 0) as6, coalesce((SELECT min(b.""createtime"") 
+    FROM ""tb_topic"" b), '0001-01-01 00:00:00.000000') as7 
 FROM ""tb_topic"" a", subquery);
             var subqueryList = select.ToList(a => new
             {
                 all = a,
-                count = select.As("b").Min(b => b.Id)
+                min = select.As("b").Min(b => b.Id),
+                min2 = select.As("b").Min(b => b.CreateTime)
             });
         }
         [Fact]
@@ -949,16 +961,18 @@ FROM ""tb_topic"" a", subquery);
             var subquery = select.ToSql(a => new
             {
                 all = a,
-                count = select.As("b").Max(b => b.Id)
+                max = select.As("b").Max(b => b.Id),
+                max2 = select.As("b").Max(b => b.CreateTime)
             });
-            Assert.Equal(@"SELECT a.""id"" as1, a.""clicks"" as2, a.""typeguid"" as3, a.""title"" as4, a.""createtime"" as5, (SELECT max(b.""id"") 
-	FROM ""tb_topic"" b 
-	limit 1) as6 
+            Assert.Equal(@"SELECT a.""id"" as1, a.""clicks"" as2, a.""typeguid"" as3, a.""title"" as4, a.""createtime"" as5, coalesce((SELECT max(b.""id"") 
+    FROM ""tb_topic"" b), 0) as6, coalesce((SELECT max(b.""createtime"") 
+    FROM ""tb_topic"" b), '0001-01-01 00:00:00.000000') as7 
 FROM ""tb_topic"" a", subquery);
             var subqueryList = select.ToList(a => new
             {
                 all = a,
-                count = select.As("b").Max(b => b.Id)
+                max = select.As("b").Max(b => b.Id),
+                max2 = select.As("b").Max(b => b.CreateTime)
             });
         }
         [Fact]
@@ -969,9 +983,8 @@ FROM ""tb_topic"" a", subquery);
                 all = a,
                 count = select.As("b").Avg(b => b.Id)
             });
-            Assert.Equal(@"SELECT a.""id"" as1, a.""clicks"" as2, a.""typeguid"" as3, a.""title"" as4, a.""createtime"" as5, (SELECT avg(b.""id"") 
-	FROM ""tb_topic"" b 
-	limit 1) as6 
+            Assert.Equal(@"SELECT a.""id"" as1, a.""clicks"" as2, a.""typeguid"" as3, a.""title"" as4, a.""createtime"" as5, coalesce((SELECT avg(b.""id"") 
+    FROM ""tb_topic"" b), 0) as6 
 FROM ""tb_topic"" a", subquery);
             var subqueryList = select.ToList(a => new
             {
@@ -985,9 +998,17 @@ FROM ""tb_topic"" a", subquery);
             var subquery = select.Where(a => select.As("b").ToList(b => b.Title).Contains(a.Id.ToString())).ToSql();
             Assert.Equal(@"SELECT a.""id"", a.""clicks"", a.""typeguid"", a.""title"", a.""createtime"" 
 FROM ""tb_topic"" a 
-WHERE ((((a.""id"")::varchar) in (SELECT b.""title"" 
-	FROM ""tb_topic"" b)))", subquery);
+WHERE ((((a.""id"")::text) in (SELECT b.""title"" 
+    FROM ""tb_topic"" b)))", subquery);
             var subqueryList = select.Where(a => select.As("b").ToList(b => b.Title).Contains(a.Id.ToString())).ToList();
+
+            subquery = select.Where(a => select.As("b").Limit(10).ToList(b => b.Title).Contains(a.Id.ToString())).ToSql();
+            Assert.Equal(@"SELECT a.""id"", a.""clicks"", a.""typeguid"", a.""title"", a.""createtime"" 
+FROM ""tb_topic"" a 
+WHERE ((((a.""id"")::text) in (SELECT b.""title"" 
+    FROM ""tb_topic"" b 
+    limit 10)))", subquery);
+            subqueryList = select.Where(a => select.As("b").Limit(10).ToList(b => b.Title).Contains(a.Id.ToString())).ToList();
         }
         [Fact]
         public void As()
@@ -1064,12 +1085,12 @@ WHERE ((((a.""id"")::varchar) in (SELECT b.""title""
 
             query = select.AsTable((_, old) => old).AsTable((_, old) => old);
             sql = query.ToSql().Replace("\r\n", "");
-            Assert.Equal("SELECT  * from (SELECT a.\"id\", a.\"clicks\", a.\"typeguid\", a.\"title\", a.\"createtime\" FROM \"tb_topic\" a) ftb UNION ALLSELECT  * from (SELECT a.\"id\", a.\"clicks\", a.\"typeguid\", a.\"title\", a.\"createtime\" FROM \"tb_topic\" a) ftb", sql);
+            Assert.Equal("SELECT  * from (SELECT a.\"id\", a.\"clicks\", a.\"typeguid\", a.\"title\", a.\"createtime\" FROM \"tb_topic\" a) ftb UNION ALL SELECT  * from (SELECT a.\"id\", a.\"clicks\", a.\"typeguid\", a.\"title\", a.\"createtime\" FROM \"tb_topic\" a) ftb", sql);
             query.ToList();
 
             query = select.AsTable((_, old) => old).AsTable((_, old) => old);
             sql = query.ToSql("count(1) as1").Replace("\r\n", "");
-            Assert.Equal("SELECT  * from (SELECT count(1) as1 FROM \"tb_topic\" a) ftb UNION ALLSELECT  * from (SELECT count(1) as1 FROM \"tb_topic\" a) ftb", sql);
+            Assert.Equal("SELECT  * from (SELECT count(1) as1 FROM \"tb_topic\" a) ftb UNION ALL SELECT  * from (SELECT count(1) as1 FROM \"tb_topic\" a) ftb", sql);
             query.Count();
 
             select.AsTable((_, old) => old).AsTable((_, old) => old).Max(a => a.Id);
@@ -1765,7 +1786,7 @@ WHERE ((((a.""id"")::varchar) in (SELECT b.""title""
             var fsql = g.pgsql;
             fsql.Delete<BaseDistrict>().Where("1=1").ExecuteAffrows();
             var repo = fsql.GetRepository<VM_District_Child>();
-            repo.DbContextOptions.EnableAddOrUpdateNavigateList = true;
+            repo.DbContextOptions.EnableCascadeSave = true;
             repo.DbContextOptions.NoneParameter = true;
             repo.Insert(new VM_District_Child
             {
@@ -1775,7 +1796,7 @@ WHERE ((((a.""id"")::varchar) in (SELECT b.""title""
                     new VM_District_Child
                     {
                         Code = "110000",
-                        Name = "北京市",
+                        Name = "北京",
                         Childs = new List<VM_District_Child>(new[] {
                             new VM_District_Child{ Code="110100", Name = "北京市" },
                             new VM_District_Child{ Code="110101", Name = "东城区" },
@@ -1813,6 +1834,68 @@ WHERE ((((a.""id"")::varchar) in (SELECT b.""title""
             Assert.Equal(2, t3[0].Childs[0].Childs.Count);
             Assert.Equal("110100", t3[0].Childs[0].Childs[0].Code);
             Assert.Equal("110101", t3[0].Childs[0].Childs[1].Code);
+
+            t3 = fsql.Select<VM_District_Child>().Where(a => a.Name == "中国").AsTreeCte().OrderBy(a => a.Code).ToTreeList();
+            Assert.Single(t3);
+            Assert.Equal("100000", t3[0].Code);
+            Assert.Single(t3[0].Childs);
+            Assert.Equal("110000", t3[0].Childs[0].Code);
+            Assert.Equal(2, t3[0].Childs[0].Childs.Count);
+            Assert.Equal("110100", t3[0].Childs[0].Childs[0].Code);
+            Assert.Equal("110101", t3[0].Childs[0].Childs[1].Code);
+
+            t3 = fsql.Select<VM_District_Child>().Where(a => a.Name == "中国").AsTreeCte().OrderBy(a => a.Code).ToList();
+            Assert.Equal(4, t3.Count);
+            Assert.Equal("100000", t3[0].Code);
+            Assert.Equal("110000", t3[1].Code);
+            Assert.Equal("110100", t3[2].Code);
+            Assert.Equal("110101", t3[3].Code);
+
+            t3 = fsql.Select<VM_District_Child>().Where(a => a.Name == "北京").AsTreeCte().OrderBy(a => a.Code).ToList();
+            Assert.Equal(3, t3.Count);
+            Assert.Equal("110000", t3[0].Code);
+            Assert.Equal("110100", t3[1].Code);
+            Assert.Equal("110101", t3[2].Code);
+
+            var t4 = fsql.Select<VM_District_Child>().Where(a => a.Name == "中国").AsTreeCte(a => a.Name).OrderBy(a => a.Code)
+                .ToList(a => new { item = a, level = Convert.ToInt32("a.cte_level"), path = "a.cte_path" });
+            Assert.Equal(4, t4.Count);
+            Assert.Equal("100000", t4[0].item.Code);
+            Assert.Equal("110000", t4[1].item.Code);
+            Assert.Equal("110100", t4[2].item.Code);
+            Assert.Equal("110101", t4[3].item.Code);
+            Assert.Equal("中国", t4[0].path);
+            Assert.Equal("中国 -> 北京", t4[1].path);
+            Assert.Equal("中国 -> 北京 -> 北京市", t4[2].path);
+            Assert.Equal("中国 -> 北京 -> 东城区", t4[3].path);
+
+            t4 = fsql.Select<VM_District_Child>().Where(a => a.Name == "中国").AsTreeCte(a => a.Name + "[" + a.Code + "]").OrderBy(a => a.Code)
+                .ToList(a => new { item = a, level = Convert.ToInt32("a.cte_level"), path = "a.cte_path" });
+            Assert.Equal(4, t4.Count);
+            Assert.Equal("100000", t4[0].item.Code);
+            Assert.Equal("110000", t4[1].item.Code);
+            Assert.Equal("110100", t4[2].item.Code);
+            Assert.Equal("110101", t4[3].item.Code);
+            Assert.Equal("中国[100000]", t4[0].path);
+            Assert.Equal("中国[100000] -> 北京[110000]", t4[1].path);
+            Assert.Equal("中国[100000] -> 北京[110000] -> 北京市[110100]", t4[2].path);
+            Assert.Equal("中国[100000] -> 北京[110000] -> 东城区[110101]", t4[3].path);
+
+            var select = fsql.Select<VM_District_Child>()
+                .Where(a => a.Name == "中国")
+                .AsTreeCte()
+                //.OrderBy("a.cte_level desc") //递归层级
+                ;
+            // var list = select.ToList(); //自己调试看查到的数据
+            select.ToUpdate().Set(a => a.testint, 855).ExecuteAffrows();
+            Assert.Equal(855, fsql.Select<VM_District_Child>()
+                .Where(a => a.Name == "中国")
+                .AsTreeCte().Distinct().First(a => a.testint));
+
+            Assert.Equal(4, select.ToDelete().ExecuteAffrows());
+            Assert.False(fsql.Select<VM_District_Child>()
+                .Where(a => a.Name == "中国")
+                .AsTreeCte().Any());
         }
 
         [Table(Name = "D_District")]
@@ -1826,6 +1909,8 @@ WHERE ((((a.""id"")::varchar) in (SELECT b.""title""
 
             [Column(StringLength = 6)]
             public virtual string ParentCode { get; set; }
+
+            public int testint { get; set; }
         }
         [Table(Name = "D_District", DisableSyncStructure = true)]
         public class VM_District_Child : BaseDistrict

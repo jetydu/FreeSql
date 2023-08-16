@@ -1,13 +1,9 @@
 ﻿using FreeSql.Aop;
-using FreeSql.Internal;
-using FreeSql.Internal.Model;
 using System;
-using System.Collections.Generic;
 using System.Data;
-using System.Data.Common;
-using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace FreeSql.MySql.Curd
@@ -21,7 +17,8 @@ namespace FreeSql.MySql.Curd
         public OnDuplicateKeyUpdate(IInsert<T1> insert)
         {
             _mysqlInsert = insert as MySqlInsert<T1>;
-            if (_mysqlInsert == null) throw new Exception("OnDuplicateKeyUpdate 是 FreeSql.Provider.MySql/FreeSql.Provider.MySqlConnector 特有的功能");
+            if (_mysqlInsert == null) throw new Exception(CoreStrings.S_Features_Unique("OnDuplicateKeyUpdate", "MySql/FreeSql.Provider.MySqlConnector"));
+            if (_mysqlInsert._noneParameterFlag == "c") _mysqlInsert._noneParameterFlag = "cu";
         }
 
         protected void ClearData()
@@ -88,16 +85,23 @@ namespace FreeSql.MySql.Curd
 
                     if (colidx > 0) sb.Append(", \r\n");
 
-                    if (col.Attribute.IsVersion == true)
+                    if (col.Attribute.IsVersion == true && col.Attribute.MapType != typeof(byte[]))
                     {
                         var field = _mysqlInsert.InternalCommonUtils.QuoteSqlName(col.Attribute.Name);
                         sb.Append(field).Append(" = ").Append(field).Append(" + 1");
                     }
                     else if (_mysqlInsert.InternalIgnore.ContainsKey(col.Attribute.Name))
                     {
-                        var caseWhen = _mysqlUpdate.InternalWhereCaseSource(col.CsName, sqlval => sqlval).Trim();
-                        sb.Append(caseWhen);
-                        if (caseWhen.EndsWith(" END")) _mysqlUpdate.InternalToSqlCaseWhenEnd(sb, col);
+                        if (string.IsNullOrEmpty(col.DbUpdateValue) == false)
+                        {
+                            sb.Append(_mysqlInsert.InternalCommonUtils.QuoteSqlName(col.Attribute.Name)).Append(" = ").Append(col.DbUpdateValue);
+                        }
+                        else
+                        {
+                            var caseWhen = _mysqlUpdate.InternalWhereCaseSource(col.CsName, sqlval => sqlval).Trim();
+                            sb.Append(caseWhen);
+                            if (caseWhen.EndsWith(" END")) _mysqlUpdate.InternalToSqlCaseWhenEnd(sb, col);
+                        }
                     }
                     else
                     {
@@ -122,12 +126,12 @@ namespace FreeSql.MySql.Curd
             Exception exception = null;
             try
             {
-                ret = _mysqlInsert.InternalOrm.Ado.ExecuteNonQuery(_mysqlInsert.InternalConnection, _mysqlInsert.InternalTransaction, CommandType.Text, sql, _mysqlInsert.InternalParams);
+                ret = _mysqlInsert.InternalOrm.Ado.ExecuteNonQuery(_mysqlInsert.InternalConnection, _mysqlInsert.InternalTransaction, CommandType.Text, sql, _mysqlInsert._commandTimeout, _mysqlInsert.InternalParams);
             }
             catch (Exception ex)
             {
                 exception = ex;
-                throw ex;
+                throw;
             }
             finally
             {
@@ -140,7 +144,7 @@ namespace FreeSql.MySql.Curd
 
 #if net40
 #else
-        async public Task<long> ExecuteAffrowsAsync()
+        async public Task<long> ExecuteAffrowsAsync(CancellationToken cancellationToken = default)
         {
             var sql = this.ToSql();
             if (string.IsNullOrEmpty(sql)) return 0;
@@ -151,12 +155,12 @@ namespace FreeSql.MySql.Curd
             Exception exception = null;
             try
             {
-                ret = await _mysqlInsert.InternalOrm.Ado.ExecuteNonQueryAsync(_mysqlInsert.InternalConnection, _mysqlInsert.InternalTransaction, CommandType.Text, sql, _mysqlInsert.InternalParams);
+                ret = await _mysqlInsert.InternalOrm.Ado.ExecuteNonQueryAsync(_mysqlInsert.InternalConnection, _mysqlInsert.InternalTransaction, CommandType.Text, sql, _mysqlInsert._commandTimeout, _mysqlInsert.InternalParams, cancellationToken);
             }
             catch (Exception ex)
             {
                 exception = ex;
-                throw ex;
+                throw;
             }
             finally
             {

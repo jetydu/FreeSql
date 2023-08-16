@@ -49,13 +49,13 @@
       <Project>{af9c50ec-6eb6-494b-9b3b-7edba6fd0ebb}</Project>
       <Name>FreeSql</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\Providers\FreeSql.Provider.Dameng\FreeSql.Provider.Dameng.csproj">
-      <Project>{e74d90e8-1cbc-4677-817b-1ca05ab97937}</Project>
-      <Name>FreeSql.Provider.Dameng</Name>
-    </ProjectReference>
     <ProjectReference Include="..\..\Providers\FreeSql.Provider.MySql\FreeSql.Provider.MySql.csproj">
       <Project>{28c6a39c-7ae7-4210-b7b0-0970216637a8}</Project>
       <Name>FreeSql.Provider.MySql</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\Providers\FreeSql.Provider.Sqlite\FreeSql.Provider.Sqlite.csproj">
+      <Project>{559b6369-1868-4a06-a590-f80ba7b80a1b}</Project>
+      <Name>FreeSql.Provider.Sqlite</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\Providers\FreeSql.Provider.SqlServer\FreeSql.Provider.SqlServer.csproj">
       <Project>{b61aac9e-59e9-4f47-bbe3-97ac24112efe}</Project>
@@ -63,9 +63,17 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json">
-      <Version>12.0.3</Version>
+    <PackageReference Include="Dapper">
+      <Version>1.50.2</Version>
     </PackageReference>
+    <PackageReference Include="Newtonsoft.Json">
+      <Version>13.0.1</Version>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\.editorconfig">
+      <Link>.editorconfig</Link>
+    </None>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

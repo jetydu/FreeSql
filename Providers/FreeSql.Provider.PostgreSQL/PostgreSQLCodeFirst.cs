@@ -1,4 +1,5 @@
-﻿using FreeSql.Internal;
+﻿using FreeSql.DataAnnotations;
+using FreeSql.Internal;
 using FreeSql.Internal.Model;
 using Newtonsoft.Json.Linq;
 using Npgsql.LegacyPostgis;
@@ -10,6 +11,7 @@ using System.Data;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
+using System.Numerics;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -39,6 +41,7 @@ namespace FreeSql.PostgreSQL
                 { typeof(decimal).FullName, CsToDb.New(NpgsqlDbType.Numeric, "numeric", "numeric(10,2) NOT NULL", false, false, 0) },{ typeof(decimal?).FullName, CsToDb.New(NpgsqlDbType.Numeric, "numeric", "numeric(10,2)", false, true, null) },
 
                 { typeof(string).FullName, CsToDb.New(NpgsqlDbType.Varchar, "varchar", "varchar(255)", false, null, "") },
+                { typeof(char).FullName, CsToDb.New(NpgsqlDbType.Char, "bpchar", "bpchar(1)", false, null, '\0') },
 
                 { typeof(TimeSpan).FullName, CsToDb.New(NpgsqlDbType.Time, "time","time NOT NULL", false, false, 0) },{ typeof(TimeSpan?).FullName, CsToDb.New(NpgsqlDbType.Time, "time", "time",false, true, null) },
                 { typeof(DateTime).FullName, CsToDb.New(NpgsqlDbType.Timestamp, "timestamp", "timestamp NOT NULL", false, false, new DateTime(1970,1,1)) },{ typeof(DateTime?).FullName, CsToDb.New(NpgsqlDbType.Timestamp, "timestamp", "timestamp", false, true, null) },
@@ -46,6 +49,7 @@ namespace FreeSql.PostgreSQL
                 { typeof(bool).FullName, CsToDb.New(NpgsqlDbType.Boolean, "bool","bool NOT NULL", null, false, false) },{ typeof(bool?).FullName, CsToDb.New(NpgsqlDbType.Boolean, "bool","bool", null, true, null) },
                 { typeof(Byte[]).FullName, CsToDb.New(NpgsqlDbType.Bytea, "bytea", "bytea", false, null, new byte[0]) },
                 { typeof(BitArray).FullName, CsToDb.New(NpgsqlDbType.Varbit, "varbit", "varbit(64)", false, null, new BitArray(new byte[64])) },
+                { typeof(BigInteger).FullName, CsToDb.New(NpgsqlDbType.Numeric, "numeric", "numeric(78,0) NOT NULL", false, false, 0) },{ typeof(BigInteger?).FullName, CsToDb.New(NpgsqlDbType.Numeric, "numeric", "numeric(78,0)", false, true, null) },
 
                 { typeof(NpgsqlPoint).FullName, CsToDb.New(NpgsqlDbType.Point, "point", "point NOT NULL", false, false, new NpgsqlPoint(0, 0)) },{ typeof(NpgsqlPoint?).FullName, CsToDb.New(NpgsqlDbType.Point, "point", "point", false, true, null) },
                 { typeof(NpgsqlLine).FullName, CsToDb.New(NpgsqlDbType.Line, "line", "line NOT NULL", false, false, new NpgsqlLine(0, 0, 1)) },{ typeof(NpgsqlLine?).FullName, CsToDb.New(NpgsqlDbType.Line, "line", "line", false, true, null) },
@@ -70,6 +74,7 @@ namespace FreeSql.PostgreSQL
                 { typeof(NpgsqlRange<DateTime>).FullName, CsToDb.New(NpgsqlDbType.Range | NpgsqlDbType.Timestamp, "tsrange", "tsrange NOT NULL", false, false, NpgsqlRange<DateTime>.Empty) },{ typeof(NpgsqlRange<DateTime>?).FullName, CsToDb.New(NpgsqlDbType.Range | NpgsqlDbType.Timestamp, "tsrange", "tsrange", false, true, null) },
 
                 { typeof(Dictionary<string, string>).FullName, CsToDb.New(NpgsqlDbType.Hstore, "hstore", "hstore", false, null, new Dictionary<string, string>()) },
+
                 { typeof(PostgisPoint).FullName, CsToDb.New(NpgsqlDbType.Geometry, "geometry", "geometry", false, null, new PostgisPoint(0, 0)) },
                 { typeof(PostgisLineString).FullName, CsToDb.New(NpgsqlDbType.Geometry, "geometry", "geometry", false, null, new PostgisLineString(new []{new Coordinate2D(0, 0),new Coordinate2D(0, 0) })) },
                 { typeof(PostgisPolygon).FullName, CsToDb.New(NpgsqlDbType.Geometry, "geometry", "geometry", false, null, new PostgisPolygon(new []{new []{new Coordinate2D(0, 0),new Coordinate2D(0, 0) }, new []{new Coordinate2D(0, 0),new Coordinate2D(0, 0) } })) },
@@ -78,7 +83,18 @@ namespace FreeSql.PostgreSQL
                 { typeof(PostgisMultiPolygon).FullName, CsToDb.New(NpgsqlDbType.Geometry, "geometry", "geometry", false, null, new PostgisMultiPolygon(new[]{new PostgisPolygon(new []{new []{new Coordinate2D(0, 0),new Coordinate2D(0, 0) }, new []{new Coordinate2D(0, 0),new Coordinate2D(0, 0) } }),new PostgisPolygon(new []{new []{new Coordinate2D(0, 0),new Coordinate2D(0, 0) }, new []{new Coordinate2D(0, 0),new Coordinate2D(0, 0) } }) })) },
                 { typeof(PostgisGeometry).FullName, CsToDb.New(NpgsqlDbType.Geometry, "geometry", "geometry", false, null, new PostgisPoint(0, 0)) },
                 { typeof(PostgisGeometryCollection).FullName, CsToDb.New(NpgsqlDbType.Geometry, "geometry", "geometry", false, null, new PostgisGeometryCollection(new[]{new PostgisPoint(0, 0),new PostgisPoint(0, 0) })) },
-            };
+
+#if nts
+                { typeof(NetTopologySuite.Geometries.Point).FullName, CsToDb.New(NpgsqlDbType.Geometry, "geometry", "geometry", false, null, new NetTopologySuite.Geometries.Point(0, 0)) },
+                { typeof(NetTopologySuite.Geometries.LineString).FullName, CsToDb.New(NpgsqlDbType.Geometry, "geometry", "geometry", false, null, new NetTopologySuite.Geometries.LineString(new []{new NetTopologySuite.Geometries.Coordinate(0, 0),new NetTopologySuite.Geometries.Coordinate(0, 0) })) },
+                { typeof(NetTopologySuite.Geometries.Polygon).FullName, CsToDb.New(NpgsqlDbType.Geometry, "geometry", "geometry", false, null, new NetTopologySuite.Geometries.Polygon(new NetTopologySuite.Geometries.LinearRing(new []{ new NetTopologySuite.Geometries.Coordinate(0, 0),new NetTopologySuite.Geometries.Coordinate(0, 0), new NetTopologySuite.Geometries.Coordinate(0, 0),new NetTopologySuite.Geometries.Coordinate(0, 0) }))) },
+                { typeof(NetTopologySuite.Geometries.MultiPoint).FullName, CsToDb.New(NpgsqlDbType.Geometry, "geometry", "geometry", false, null, new NetTopologySuite.Geometries.MultiPoint(new []{new NetTopologySuite.Geometries.Point(0, 0),new NetTopologySuite.Geometries.Point(0, 0) })) },
+                { typeof(NetTopologySuite.Geometries.MultiLineString).FullName, CsToDb.New(NpgsqlDbType.Geometry, "geometry", "geometry", false, null, new NetTopologySuite.Geometries.MultiLineString(new[]{new NetTopologySuite.Geometries.LineString(new []{new NetTopologySuite.Geometries.Coordinate(0, 0),new NetTopologySuite.Geometries.Coordinate(0, 0) }),new NetTopologySuite.Geometries.LineString(new []{new NetTopologySuite.Geometries.Coordinate(0, 0),new NetTopologySuite.Geometries.Coordinate(0, 0) }) })) },
+                { typeof(NetTopologySuite.Geometries.MultiPolygon).FullName, CsToDb.New(NpgsqlDbType.Geometry, "geometry", "geometry", false, null, new NetTopologySuite.Geometries.MultiPolygon(new[]{new NetTopologySuite.Geometries.Polygon(new NetTopologySuite.Geometries.LinearRing(new []{ new NetTopologySuite.Geometries.Coordinate(0, 0),new NetTopologySuite.Geometries.Coordinate(0, 0), new NetTopologySuite.Geometries.Coordinate(0, 0),new NetTopologySuite.Geometries.Coordinate(0, 0) })), new NetTopologySuite.Geometries.Polygon(new NetTopologySuite.Geometries.LinearRing(new []{ new NetTopologySuite.Geometries.Coordinate(0, 0),new NetTopologySuite.Geometries.Coordinate(0, 0), new NetTopologySuite.Geometries.Coordinate(0, 0),new NetTopologySuite.Geometries.Coordinate(0, 0) })) })) },
+                { typeof(NetTopologySuite.Geometries.Geometry).FullName, CsToDb.New(NpgsqlDbType.Geometry, "geometry", "geometry", false, null, new NetTopologySuite.Geometries.Point(0, 0)) },
+                { typeof(NetTopologySuite.Geometries.GeometryCollection).FullName, CsToDb.New(NpgsqlDbType.Geometry, "geometry", "geometry", false, null, new NetTopologySuite.Geometries.GeometryCollection(new[]{new NetTopologySuite.Geometries.Point(0, 0),new NetTopologySuite.Geometries.Point(0, 0) })) },
+#endif
+        };
 
         public override DbInfoResult GetDbInfo(Type type)
         {
@@ -99,8 +115,8 @@ namespace FreeSql.PostgreSQL
             if (enumType != null)
             {
                 var newItem = enumType.GetCustomAttributes(typeof(FlagsAttribute), false).Any() ?
-                    CsToDb.New(NpgsqlDbType.Bigint, "int8", $"int8{(type.IsEnum ? " NOT NULL" : "")}", false, type.IsEnum ? false : true, Enum.GetValues(enumType).GetValue(0)) :
-                    CsToDb.New(NpgsqlDbType.Integer, "int4", $"int4{(type.IsEnum ? " NOT NULL" : "")}", false, type.IsEnum ? false : true, Enum.GetValues(enumType).GetValue(0));
+                    CsToDb.New(NpgsqlDbType.Bigint, "int8", $"int8{(type.IsEnum ? " NOT NULL" : "")}", false, type.IsEnum ? false : true, enumType.CreateInstanceGetDefaultValue()) :
+                    CsToDb.New(NpgsqlDbType.Integer, "int4", $"int4{(type.IsEnum ? " NOT NULL" : "")}", false, type.IsEnum ? false : true, enumType.CreateInstanceGetDefaultValue());
                 if (_dicCsToDb.ContainsKey(type.FullName) == false)
                 {
                     lock (_dicCsToDbLock)
@@ -117,14 +133,23 @@ namespace FreeSql.PostgreSQL
         protected override string GetComparisonDDLStatements(params TypeAndName[] objects)
         {
             var sb = new StringBuilder();
-            var seqcols = new List<(ColumnInfo, string[], bool)>(); //序列
+            var seqcols = new List<NativeTuple<ColumnInfo, string[], bool>>(); //序列
+
+            var isPg95 = true;
+            var isPg96 = true;
+            var isPg10 = (_orm.DbFirst as PostgreSQLDbFirst).IsPg10;
+            using (var conn = _orm.Ado.MasterPool.Get(TimeSpan.FromSeconds(5)))
+            {
+                isPg95 = PostgreSQLDbFirst.ParsePgVersion(conn.Value.ServerVersion, 9, 5).Item1;
+                isPg96 = PostgreSQLDbFirst.ParsePgVersion(conn.Value.ServerVersion, 9, 6).Item1;
+            }
 
             foreach (var obj in objects)
             {
                 if (sb.Length > 0) sb.Append("\r\n");
                 var tb = _commonUtils.GetTableByEntity(obj.entityType);
-                if (tb == null) throw new Exception($"类型 {obj.entityType.FullName} 不可迁移");
-                if (tb.Columns.Any() == false) throw new Exception($"类型 {obj.entityType.FullName} 不可迁移，可迁移属性0个");
+                if (tb == null) throw new Exception(CoreStrings.S_Type_IsNot_Migrable(obj.entityType.FullName));
+                if (tb.Columns.Any() == false) throw new Exception(CoreStrings.S_Type_IsNot_Migrable_0Attributes(obj.entityType.FullName));
                 var tbname = _commonUtils.SplitTableName(tb.DbName);
                 if (tbname?.Length == 1) tbname = new[] { "public", tbname[0] };
 
@@ -162,8 +187,13 @@ namespace FreeSql.PostgreSQL
                         sb.Append("CREATE TABLE IF NOT EXISTS ").Append(createTableName).Append(" ( ");
                         foreach (var tbcol in tb.ColumnsByPosition)
                         {
-                            sb.Append(" \r\n  ").Append(_commonUtils.QuoteSqlName(tbcol.Attribute.Name)).Append(" ").Append(tbcol.Attribute.DbType).Append(",");
-                            if (tbcol.Attribute.IsIdentity == true) seqcols.Add((tbcol, tbname, true));
+                            sb.Append(" \r\n  ").Append(_commonUtils.QuoteSqlName(tbcol.Attribute.Name)).Append(" ").Append(tbcol.Attribute.DbType);
+                            if (tbcol.Attribute.IsIdentity == true)
+                            {
+                                if (isPg10) sb.Append(" GENERATED BY DEFAULT AS IDENTITY");
+                                else seqcols.Add(NativeTuple.Create(tbcol, tbname, true));
+                            }
+                            sb.Append(",");
                         }
                         if (tb.Primarys.Any())
                         {
@@ -179,7 +209,11 @@ namespace FreeSql.PostgreSQL
                         {
                             sb.Append("CREATE ");
                             if (uk.IsUnique) sb.Append("UNIQUE ");
-                            sb.Append("INDEX ").Append(_commonUtils.QuoteSqlName(uk.Name)).Append(" ON ").Append(createTableName).Append("(");
+                            sb.Append("INDEX ");
+                            if (isPg95) sb.Append("IF NOT EXISTS ");
+                            sb.Append(_commonUtils.QuoteSqlName(ReplaceIndexName(uk.Name, tbname[1]))).Append(" ON ").Append(createTableName);
+                            if (uk.IndexMethod != IndexMethod.B_Tree) sb.Append(" USING ").Append(uk.IndexMethod.ToString().ToUpper().Replace("_", ""));
+                            sb.Append("(");
                             foreach (var tbcol in uk.Columns)
                             {
                                 sb.Append(_commonUtils.QuoteSqlName(tbcol.Column.Attribute.Name));
@@ -211,7 +245,7 @@ namespace FreeSql.PostgreSQL
                     tboldname = null; //如果新表已经存在，不走改表名逻辑
 
                 //对比字段，只可以修改类型、增加字段、有限的修改字段名；保证安全不删除字段
-                var sql = _commonUtils.FormatSql(@"
+                var sql = _commonUtils.FormatSql($@"
 select
 a.attname,
 t.typname,
@@ -221,7 +255,7 @@ case when a.attnotnull then '0' else '1' end as is_nullable,
 --e.adsrc,
 (select pg_get_expr(adbin, adrelid) from pg_attrdef where adrelid = e.adrelid limit 1) is_identity,
 a.attndims,
-d.description as comment
+d.description as comment{(isPg10 ? ", a.attidentity" : "")}
 from pg_class c
 inner join pg_attribute a on a.attnum > 0 and a.attrelid = c.oid
 inner join pg_type t on t.oid = a.atttypid
@@ -230,7 +264,7 @@ left join pg_description d on d.objoid = a.attrelid and d.objsubid = a.attnum
 left join pg_attrdef e on e.adrelid = a.attrelid and e.adnum = a.attnum
 inner join pg_namespace ns on ns.oid = c.relnamespace
 inner join pg_namespace ns2 on ns2.oid = t.typnamespace
-where ns.nspname = {0} and c.relname = {1}", tboldname ?? tbname);
+where ns.nspname = {{0}} and c.relname = {{1}}", tboldname ?? tbname);
                 var ds = _orm.Ado.ExecuteArray(CommandType.Text, sql);
                 var tbstruct = ds.ToDictionary(a => string.Concat(a[0]), a =>
                 {
@@ -238,9 +272,21 @@ where ns.nspname = {0} and c.relname = {1}", tboldname ?? tbname);
                     var type = string.Concat(a[1]);
                     var sqlType = string.Concat(a[3]);
                     var max_length = long.Parse(string.Concat(a[2]));
+                    type = type.Replace("smallint", "int2")
+                        .Replace("integer", "int4")
+                        .Replace("bigint", "int8")
+                        .Replace("real", "float4")
+                        .Replace("double precision", "float8")
+                        .Replace("character varying", "varchar"); //pg15+
+                    sqlType = type.Replace("smallint", "int2")
+                        .Replace("integer", "int4")
+                        .Replace("bigint", "int8")
+                        .Replace("real", "float4")
+                        .Replace("double precision", "float8")
+                        .Replace("character varying", "varchar"); //pg15+
                     switch (sqlType.ToLower())
                     {
-                        case "bool": case "name": case "bit": case "varbit": case "bpchar": case "varchar": case "bytea": case "text": case "uuid": break;
+                        case "bool": case "name": case "bit": case "varbit": case "bpchar": case "varchar": case "bytea": case "text": case "uuid":
                         default: max_length *= 8; break;
                     }
                     if (type.StartsWith("_"))
@@ -249,13 +295,16 @@ where ns.nspname = {0} and c.relname = {1}", tboldname ?? tbname);
                         if (attndims == 0) attndims++;
                     }
                     if (sqlType.StartsWith("_")) sqlType = sqlType.Substring(1);
+                    var is_identity_pg9 = string.Concat(a[5]).StartsWith(@"nextval('") && (string.Concat(a[5]).EndsWith(@"'::regclass)") || string.Concat(a[5]).EndsWith(@"')"));
                     return new
                     {
                         column = string.Concat(a[0]),
                         sqlType = string.Concat(sqlType),
                         max_length = long.Parse(string.Concat(a[2])),
                         is_nullable = string.Concat(a[4]) == "1",
-                        is_identity = string.Concat(a[5]).StartsWith(@"nextval('") && string.Concat(a[5]).EndsWith(@"'::regclass)"),
+                        is_identity_pg9 = is_identity_pg9,
+                        is_identity = is_identity_pg9
+                            || isPg10 && new[] { "a", "d" }.Contains(string.Concat(a[8])), //pg10 GENERATED { BY DEFAULT | AWAYS } AS IDENTITY
                         attndims,
                         comment = string.Concat(a[7])
                     };
@@ -269,7 +318,16 @@ where ns.nspname = {0} and c.relname = {1}", tboldname ?? tbname);
                             string.IsNullOrEmpty(tbcol.Attribute.OldName) == false && tbstruct.TryGetValue(tbcol.Attribute.OldName, out tbstructcol))
                         {
                             var isCommentChanged = tbstructcol.comment != (tbcol.Comment ?? "");
-                            if (tbcol.Attribute.DbType.StartsWith(tbstructcol.sqlType, StringComparison.CurrentCultureIgnoreCase) == false ||
+                            var sqlTypeSize = tbstructcol.sqlType;
+                            if (sqlTypeSize.Contains("(") == false)
+                            {
+                                switch (sqlTypeSize.ToLower())
+                                {
+                                    case "bit": case "varbit": case "bpchar": case "varchar":
+                                        sqlTypeSize = $"{sqlTypeSize}({tbstructcol.max_length})"; break;
+                                }
+                            }
+                            if (tbcol.Attribute.DbType.StartsWith(sqlTypeSize, StringComparison.CurrentCultureIgnoreCase) == false ||
                                 tbcol.Attribute.DbType.Contains("[]") != (tbstructcol.attndims > 0))
                                 sbalter.Append("ALTER TABLE ").Append(_commonUtils.QuoteSqlName($"{tbname[0]}.{tbname[1]}")).Append(" ALTER COLUMN ").Append(_commonUtils.QuoteSqlName(tbstructcol.column)).Append(" TYPE ").Append(tbcol.Attribute.DbType.Split(' ').First()).Append(";\r\n");
                             if (tbcol.Attribute.IsNullable != tbstructcol.is_nullable)
@@ -282,7 +340,27 @@ where ns.nspname = {0} and c.relname = {1}", tboldname ?? tbname);
                                 }
                             }
                             if (tbcol.Attribute.IsIdentity != tbstructcol.is_identity)
-                                seqcols.Add((tbcol, tbname, tbcol.Attribute.IsIdentity == true));
+                            {
+                                if (isPg10)
+                                {
+                                    if (tbstructcol.is_identity)
+                                    {
+                                        if (tbstructcol.is_identity_pg9)
+                                            seqcols.Add(NativeTuple.Create(tbcol, tbname, false));
+                                        sbalter.Append("ALTER TABLE ").Append(_commonUtils.QuoteSqlName($"{tbname[0]}.{tbname[1]}")).Append(" ALTER COLUMN ").Append(_commonUtils.QuoteSqlName(tbcol.Attribute.Name)).Append(" DROP IDENTITY IF EXISTS;\r\n");
+                                    }
+                                    else
+                                    {
+                                        sbalter.Append("ALTER TABLE ").Append(_commonUtils.QuoteSqlName($"{tbname[0]}.{tbname[1]}")).Append(" ALTER COLUMN ").Append(_commonUtils.QuoteSqlName(tbcol.Attribute.Name)).Append(" ADD GENERATED BY DEFAULT AS IDENTITY");
+                                        var maxval = _orm.Ado.QuerySingle<int>($"select max({_commonUtils.QuoteSqlName(tbcol.Attribute.Name)}) from {_commonUtils.QuoteSqlName($"{tbname[0]}.{tbname[1]}")}");
+                                        if (maxval > 0)
+                                            sbalter.Append(" (START ").Append(maxval + 1).Append(")");
+                                        sbalter.Append(";\r\n");
+                                    }
+                                }
+                                else
+                                    seqcols.Add(NativeTuple.Create(tbcol, tbname, tbcol.Attribute.IsIdentity == true));
+                            }
                             if (string.Compare(tbstructcol.column, tbcol.Attribute.OldName, true) == 0)
                                 //修改列名
                                 sbalter.Append("ALTER TABLE ").Append(_commonUtils.QuoteSqlName($"{tbname[0]}.{tbname[1]}")).Append(" RENAME COLUMN ").Append(_commonUtils.QuoteSqlName(tbstructcol.column)).Append(" TO ").Append(_commonUtils.QuoteSqlName(tbcol.Attribute.Name)).Append(";\r\n");
@@ -294,32 +372,43 @@ where ns.nspname = {0} and c.relname = {1}", tboldname ?? tbname);
                         sbalter.Append("ALTER TABLE ").Append(_commonUtils.QuoteSqlName($"{tbname[0]}.{tbname[1]}")).Append(" ADD COLUMN ").Append(_commonUtils.QuoteSqlName(tbcol.Attribute.Name)).Append(" ").Append(tbcol.Attribute.DbType.Split(' ').First()).Append(";\r\n");
                         sbalter.Append("UPDATE ").Append(_commonUtils.QuoteSqlName($"{tbname[0]}.{tbname[1]}")).Append(" SET ").Append(_commonUtils.QuoteSqlName(tbcol.Attribute.Name)).Append(" = ").Append(tbcol.DbDefaultValue).Append(";\r\n");
                         if (tbcol.Attribute.IsNullable == false) sbalter.Append("ALTER TABLE ").Append(_commonUtils.QuoteSqlName($"{tbname[0]}.{tbname[1]}")).Append(" ALTER COLUMN ").Append(_commonUtils.QuoteSqlName(tbcol.Attribute.Name)).Append(" SET NOT NULL;\r\n");
-                        if (tbcol.Attribute.IsIdentity == true) seqcols.Add((tbcol, tbname, tbcol.Attribute.IsIdentity == true));
+                        if (tbcol.Attribute.IsIdentity == true)
+                        {
+                            if (isPg10) 
+                                sbalter.Append("ALTER TABLE ").Append(_commonUtils.QuoteSqlName($"{tbname[0]}.{tbname[1]}")).Append(" ALTER COLUMN ").Append(_commonUtils.QuoteSqlName(tbcol.Attribute.Name)).Append(" ADD GENERATED BY DEFAULT AS IDENTITY;\r\n");
+                            else 
+                                seqcols.Add(NativeTuple.Create(tbcol, tbname, tbcol.Attribute.IsIdentity == true));
+                        }
                         if (string.IsNullOrEmpty(tbcol.Comment) == false) sbalter.Append("COMMENT ON COLUMN ").Append(_commonUtils.QuoteSqlName($"{tbname[0]}.{tbname[1]}.{tbcol.Attribute.Name}")).Append(" IS ").Append(_commonUtils.FormatSql("{0}", tbcol.Comment)).Append(";\r\n");
                     }
-                    var dsuksql = _commonUtils.FormatSql(@"
+                    var dsuksql = _commonUtils.FormatSql($@"
 select
 c.attname,
 b.relname,
-case when pg_index_column_has_property(b.oid, c.attnum, 'desc') = 't' then 1 else 0 end IsDesc,
+{(isPg96 ? "case when pg_index_column_has_property(b.oid, c.attnum, 'desc') = 't' then 1 else 0 end" : "0")} IsDesc,
 case when indisunique = 't' then 1 else 0 end IsUnique
 from pg_index a
 inner join pg_class b on b.oid = a.indexrelid
 inner join pg_attribute c on c.attnum > 0 and c.attrelid = b.oid
 inner join pg_namespace ns on ns.oid = b.relnamespace
 inner join pg_class d on d.oid = a.indrelid
-where ns.nspname in ({0}) and d.relname in ({1}) and a.indisprimary = 'f'", tboldname ?? tbname);
+where ns.nspname in ({{0}}) and d.relname in ({{1}}) and a.indisprimary = 'f'", tboldname ?? tbname);
                     var dsuk = _orm.Ado.ExecuteArray(CommandType.Text, dsuksql).Select(a => new[] { string.Concat(a[0]), string.Concat(a[1]), string.Concat(a[2]), string.Concat(a[3]) });
                     foreach (var uk in tb.Indexes)
                     {
                         if (string.IsNullOrEmpty(uk.Name) || uk.Columns.Any() == false) continue;
-                        var dsukfind1 = dsuk.Where(a => string.Compare(a[1], uk.Name, true) == 0).ToArray();
-                        if (dsukfind1.Any() == false || dsukfind1.Length != uk.Columns.Length || dsukfind1.Where(a => uk.Columns.Where(b => (a[3] == "1") == uk.IsUnique && string.Compare(b.Column.Attribute.Name, a[0], true) == 0 && (a[2] == "1") == b.IsDesc).Any()).Count() != uk.Columns.Length)
+                        var ukname = ReplaceIndexName(uk.Name, tbname[1]);
+                        var dsukfind1 = dsuk.Where(a => string.Compare(a[1], ukname, true) == 0).ToArray();
+                        if (dsukfind1.Any() == false || dsukfind1.Length != uk.Columns.Length || dsukfind1.Where(a => uk.Columns.Where(b => (a[3] == "1") == uk.IsUnique && string.Compare(b.Column.Attribute.Name, a[0], true) == 0 && ((a[2] == "1") == b.IsDesc || isPg96 == false)).Any()).Count() != uk.Columns.Length)
                         {
-                            if (dsukfind1.Any()) sbalter.Append("DROP INDEX ").Append(_commonUtils.QuoteSqlName(uk.Name)).Append(";\r\n");
+                            if (dsukfind1.Any()) sbalter.Append("DROP INDEX ").Append(_commonUtils.QuoteSqlName(ukname)).Append(";\r\n");
                             sbalter.Append("CREATE ");
                             if (uk.IsUnique) sbalter.Append("UNIQUE ");
-                            sbalter.Append("INDEX ").Append(_commonUtils.QuoteSqlName(uk.Name)).Append(" ON ").Append(_commonUtils.QuoteSqlName($"{tbname[0]}.{tbname[1]}")).Append("(");
+                            sbalter.Append("INDEX ");
+                            if (isPg95) sbalter.Append("IF NOT EXISTS ");
+                            sbalter.Append(_commonUtils.QuoteSqlName(ukname)).Append(" ON ").Append(_commonUtils.QuoteSqlName($"{tbname[0]}.{tbname[1]}"));
+                            if (uk.IndexMethod != IndexMethod.B_Tree) sbalter.Append(" USING ").Append(uk.IndexMethod.ToString().ToUpper().Replace("_", ""));
+                            sbalter.Append("(");
                             foreach (var tbcol in uk.Columns)
                             {
                                 sbalter.Append(_commonUtils.QuoteSqlName(tbcol.Column.Attribute.Name));
@@ -340,7 +429,7 @@ left join pg_description d on d.objoid = a.oid and objsubid = 0
 where b.nspname not in ('pg_catalog', 'information_schema') and a.relkind in ('r') and b.nspname = {0} and a.relname = {1}
 and b.nspname || '.' || a.relname not in ('public.geography_columns','public.geometry_columns','public.raster_columns','public.raster_overviews')", tbname[0], tbname[1])));
                     if (dbcomment != (tb.Comment ?? ""))
-                        sb.Append("COMMENT ON TABLE ").Append(_commonUtils.QuoteSqlName($"{tbname[0]}.{tbname[1]}")).Append(" IS ").Append(_commonUtils.FormatSql("{0}", tb.Comment)).Append(";\r\n");
+                        sbalter.Append("COMMENT ON TABLE ").Append(_commonUtils.QuoteSqlName($"{tbname[0]}.{tbname[1]}")).Append(" IS ").Append(_commonUtils.FormatSql("{0}", tb.Comment)).Append(";\r\n");
 
                     sb.Append(sbalter);
                     continue;
@@ -360,8 +449,13 @@ where pg_namespace.nspname={0} and pg_class.relname={1} and pg_constraint.contyp
                 sb.Append("CREATE TABLE IF NOT EXISTS ").Append(tmptablename).Append(" ( ");
                 foreach (var tbcol in tb.ColumnsByPosition)
                 {
-                    sb.Append(" \r\n  ").Append(_commonUtils.QuoteSqlName(tbcol.Attribute.Name)).Append(" ").Append(tbcol.Attribute.DbType).Append(",");
-                    if (tbcol.Attribute.IsIdentity == true) seqcols.Add((tbcol, tbname, true));
+                    sb.Append(" \r\n  ").Append(_commonUtils.QuoteSqlName(tbcol.Attribute.Name)).Append(" ").Append(tbcol.Attribute.DbType);
+                    if (tbcol.Attribute.IsIdentity == true)
+                    {
+                        if (isPg10) sb.Append(" GENERATED BY DEFAULT AS IDENTITY");
+                        else seqcols.Add(NativeTuple.Create(tbcol, tbname, true));
+                    }
+                    sb.Append(",");
                 }
                 if (tb.Primarys.Any())
                 {
@@ -409,7 +503,11 @@ where pg_namespace.nspname={0} and pg_class.relname={1} and pg_constraint.contyp
                 {
                     sb.Append("CREATE ");
                     if (uk.IsUnique) sb.Append("UNIQUE ");
-                    sb.Append("INDEX ").Append(_commonUtils.QuoteSqlName(uk.Name)).Append(" ON ").Append(tablename).Append("(");
+                    sb.Append("INDEX ");
+                    if (isPg95) sb.Append("IF NOT EXISTS ");
+                    sb.Append(_commonUtils.QuoteSqlName(ReplaceIndexName(uk.Name, tbname[1]))).Append(" ON ").Append(tablename);
+                    if (uk.IndexMethod != IndexMethod.B_Tree) sb.Append(" USING ").Append(uk.IndexMethod.ToString().ToUpper().Replace("_", ""));
+                    sb.Append("(");
                     foreach (var tbcol in uk.Columns)
                     {
                         sb.Append(_commonUtils.QuoteSqlName(tbcol.Column.Attribute.Name));
@@ -417,6 +515,22 @@ where pg_namespace.nspname={0} and pg_class.relname={1} and pg_constraint.contyp
                         sb.Append(", ");
                     }
                     sb.Remove(sb.Length - 2, 2).Append(");\r\n");
+                }
+                if (isPg10)
+                {
+                    foreach (var tbcol in tb.ColumnsByPosition)
+                    {
+                        if (tbcol.Attribute.IsIdentity)
+                        {
+                            var maxval = _orm.Ado.QuerySingle<int>($"select max({_commonUtils.QuoteSqlName(tbcol.Attribute.Name)}) from {tablename}");
+                            if (maxval > 0)
+                            {
+                                sb.Append("ALTER TABLE ").Append(_commonUtils.QuoteSqlName($"{tbname[0]}.{tbname[1]}")).Append(" ALTER COLUMN ").Append(_commonUtils.QuoteSqlName(tbcol.Attribute.Name)).Append(" SET GENERATED BY DEFAULT");
+                                sb.Append(" RESTART ").Append(maxval + 1).Append("");
+                                sb.Append(";\r\n");
+                            }
+                        }
+                    }
                 }
             }
             foreach (var seqcol in seqcols)

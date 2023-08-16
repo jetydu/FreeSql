@@ -28,6 +28,10 @@ BaseEntity 是一种极简单的 CodeFirst 开发方式，特别对单表或多�
 
 > dotnet add package FreeSql.Provider.Sqlite
 
+```csharp
+BaseEntity.Initialization(fsql, null);
+```
+
 1、定义一个主键 int 并且自增的实体类型，BaseEntity TKey 指定为 int/long 时，会认为主键是自增；
 
 ```csharp
@@ -90,3 +94,37 @@ var items = UserGroup.Where(a => a.Id > 10).ToList();
 支持多表查询时，软删除条件会附加在每个表中；
 
 > 有关更多查询方法，请参考资料：https://github.com/2881099/FreeSql/wiki/%e6%9f%a5%e8%af%a2
+
+# 事务建议
+
+由于 AsyncLocal 平台兼容不好，所以交给外部管理事务。
+
+```csharp
+static AsyncLocal<IUnitOfWork> _asyncUow = new AsyncLocal<IUnitOfWork>();
+
+BaseEntity.Initialization(fsql, () => _asyncUow.Value);
+```
+
+在 Scoped 开始时： _asyncUow.Value = fsql.CreateUnitOfWork(); (也可以使用 UnitOfWorkManager 对象获取 uow)
+
+在 Scoped 结束时：_asyncUow.Value = null;
+
+如下：
+
+```csharp
+using (var uow = fsql.CreateUnitOfWork())
+{
+    _asyncUow.Value = uow;
+
+    try
+    {
+        //todo ... BaseEntity 内部 curd 方法保持使用 uow 事务
+    }
+    finally
+    {
+        _asyncUow.Value = null;
+    }
+    
+    uow.Commit();
+}
+```
