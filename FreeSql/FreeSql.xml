@@ -127,6 +127,7 @@
             <summary>
             重读功能<para></para>
             比如：[Column(RereadSql = &quot;{0}.STAsText()&quot;)]<para></para>
+            或者：[Column(RereadSql = &quot;{geo}.STAsText()&quot;)]<para></para>
             查询：SELECT a.[id], a.[geo].STAsText() FROM [table] a
             </summary>
         </member>
@@ -260,6 +261,7 @@
             <summary>
             重读功能<para></para>
             比如：[Column(RereadSql = &quot;{0}.STAsText()&quot;)]<para></para>
+            或者：[Column(RereadSql = &quot;{geo}.STAsText()&quot;)]<para></para>
             查询：SELECT a.[id], a.[geo].STAsText() FROM [table] a
             </summary>
             <param name="value"></param>
@@ -476,6 +478,15 @@
             禁用 CodeFirst 同步结构迁移
             </summary>
         </member>
+        <member name="M:FreeSql.DataAnnotations.TableFluent.AsTable(System.String)">
+            <summary>
+            格式：属性名=开始时间(递增)<para></para>
+            按年分表：[Table(Name = "log_{yyyy}", AsTable = "create_time=2022-1-1(1 year)")]<para></para>
+            按月分表：[Table(Name = "log_{yyyyMM}", AsTable = "create_time=2022-5-1(1 month)")]<para></para>
+            按日分表：[Table(Name = "log_{yyyyMMdd}", AsTable = "create_time=2022-5-1(5 day)")]<para></para>
+            按时分表：[Table(Name = "log_{yyyyMMddHH}", AsTable = "create_time=2022-5-1(6 hour)")]<para></para>
+            </summary>
+        </member>
         <member name="M:FreeSql.DataAnnotations.TableFluent.Navigate(System.String,System.String,System.Type)">
             <summary>
             导航关系Fluent，与 NavigateAttribute 对应
@@ -507,6 +518,15 @@
         <member name="M:FreeSql.DataAnnotations.TableFluent`1.DisableSyncStructure(System.Boolean)">
             <summary>
             禁用 CodeFirst 同步结构迁移
+            </summary>
+        </member>
+        <member name="M:FreeSql.DataAnnotations.TableFluent`1.AsTable(System.String)">
+            <summary>
+            格式：属性名=开始时间(递增)<para></para>
+            按年分表：[Table(Name = "log_{yyyy}", AsTable = "create_time=2022-1-1(1 year)")]<para></para>
+            按月分表：[Table(Name = "log_{yyyyMM}", AsTable = "create_time=2022-5-1(1 month)")]<para></para>
+            按日分表：[Table(Name = "log_{yyyyMMdd}", AsTable = "create_time=2022-5-1(5 day)")]<para></para>
+            按时分表：[Table(Name = "log_{yyyyMMddHH}", AsTable = "create_time=2022-5-1(6 hour)")]<para></para>
             </summary>
         </member>
         <member name="M:FreeSql.DataAnnotations.TableFluent`1.Navigate``1(System.Linq.Expressions.Expression{System.Func{`0,``0}},System.String,System.Type)">
@@ -1084,6 +1104,82 @@
             </summary>
             <returns></returns>
         </member>
+        <member name="T:FreeSql.Extensions.DynamicEntity.DynamicCompileBuilder">
+            <summary>
+            动态创建实体类型
+            </summary>
+        </member>
+        <member name="M:FreeSql.Extensions.DynamicEntity.DynamicCompileBuilder.#ctor(IFreeSql,System.String,System.Attribute[])">
+            <summary>
+            配置Class
+            </summary>
+            <param name="className">类名</param>
+            <param name="attributes">类标记的特性[Table(Name = "xxx")] [Index(xxxx)]</param>
+            <returns></returns>
+        </member>
+        <member name="M:FreeSql.Extensions.DynamicEntity.DynamicCompileBuilder.Property(System.String,System.Type,System.Attribute[])">
+            <summary>
+            配置属性
+            </summary>
+            <param name="propertyName">属性名称</param>
+            <param name="propertyType">属性类型</param>
+            <param name="attributes">属性标记的特性-支持多个</param>
+            <returns></returns>
+        </member>
+        <member name="M:FreeSql.Extensions.DynamicEntity.DynamicCompileBuilder.Property(System.String,System.Type,System.Boolean,System.Attribute[])">
+            <summary>
+            配置属性
+            </summary>
+            <param name="propertyName">属性名称</param>
+            <param name="propertyType">属性类型</param>
+            <param name="isOverride">该属性是否重写父类属性</param>
+            <param name="attributes">属性标记的特性-支持多个</param>
+            <returns></returns>
+        </member>
+        <member name="M:FreeSql.Extensions.DynamicEntity.DynamicCompileBuilder.Property(System.String,System.Type,System.Boolean,System.Object,System.Attribute[])">
+            <summary>
+            配置属性
+            </summary>
+            <param name="propertyName">属性名称</param>
+            <param name="propertyType">属性类型</param>
+            <param name="isOverride">该属性是否重写父类属性</param>
+            <param name="defaultValue">属性默认值</param>
+            <param name="attributes">属性标记的特性-支持多个</param>
+            <returns></returns>
+        </member>
+        <member name="M:FreeSql.Extensions.DynamicEntity.DynamicCompileBuilder.Extend(System.Type)">
+            <summary>
+            配置父类
+            </summary>
+            <param name="superClass">父类类型</param>
+            <returns></returns>
+        </member>
+        <member name="M:FreeSql.Extensions.DynamicEntity.DynamicCompileBuilder.OverrideProperty(System.Reflection.Emit.TypeBuilder@,System.Reflection.Emit.MethodBuilder,FreeSql.Extensions.DynamicEntity.DynamicCompileBuilder.PropertyMethodEnum,System.String)">
+            <summary>
+            Override属性
+            </summary>
+            <param name="typeBuilder"></param>
+        </member>
+        <member name="M:FreeSql.Extensions.DynamicEntity.DynamicCompileBuilder.Build">
+            <summary>
+            Emit动态创建出Class - Type
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:FreeSql.Extensions.DynamicEntity.DynamicCompileBuilder.FirstCharToLower(System.String)">
+            <summary>
+            首字母小写
+            </summary>
+            <param name="input"></param>
+            <returns></returns>
+        </member>
+        <member name="M:FreeSql.Extensions.DynamicEntity.DynamicCompileBuilder.FirstCharToUpper(System.String)">
+            <summary>
+            首字母大写
+            </summary>
+            <param name="input"></param>
+            <returns></returns>
+        </member>
         <member name="M:FreeSql.Extensions.EntityUtil.EntityUtilExtensions.GetEntityKeyString(IFreeSql,System.Type,System.Object,System.Boolean,System.String)">
             <summary>
             获取实体的主键值，以 "*|_,[,_|*" 分割，当任意一个主键属性无值时，返回 null
@@ -1369,6 +1465,14 @@
             <param name="providerType">提供者的类型，一般不需要指定，如果一直提示“缺少 FreeSql 数据库实现包：FreeSql.Provider.MySql.dll，可前往 nuget 下载”的错误，说明反射获取不到类型，此时该参数可排上用场<para></para>例如：typeof(FreeSql.SqlServer.SqlServerProvider&lt;&gt;)</param>
             <returns></returns>
         </member>
+        <member name="M:FreeSql.FreeSqlBuilder.UseCustomTableEntityCacheFactory(System.Func{System.Collections.Concurrent.ConcurrentDictionary{FreeSql.DataType,System.Collections.Concurrent.ConcurrentDictionary{System.Type,FreeSql.Internal.Model.TableInfo}}})">
+            <summary>
+            用于指定自定义实现TableEntiy 的缓存集合
+            解决多实例下相同类型映射到不同表的问题
+            </summary>
+            <param name="factory"></param>
+            <returns></returns>
+        </member>
         <member name="M:FreeSql.FreeSqlBuilder.UseAdoConnectionPool(System.Boolean)">
             <summary>
             使用原始连接池（ado.net、odbc、oledb）<para></para>
@@ -1467,7 +1571,7 @@
         </member>
         <member name="M:FreeSql.FreeSqlBuilder.UseMappingPriority(FreeSql.Internal.MappingPriorityType,FreeSql.Internal.MappingPriorityType,FreeSql.Internal.MappingPriorityType)">
             <summary>
-            指定映射优先级<para></para>
+            指定映射优先级（从小到大）<para></para>
             例如表名：实体类名 &lt; Aop &lt; FluentApi &lt; Attribute &lt; AsTable<para></para>
             事件 Aop -------> fsql.Aop.ConfigEntity/fsql.Aop.ConfigEntityProperty<para></para>
             方法 FluentApi -> fsql.CodeFirst.ConfigEntity/fsql.CodeFirst.Entity<para></para>
@@ -1877,6 +1981,16 @@
             </summary>
             <typeparam name="TMember"></typeparam>
             <param name="exp"></param>
+            <returns></returns>
+        </member>
+        <member name="M:FreeSql.IInsertOrUpdate`1.BatchOptions(System.Int32,System.Boolean)">
+            <summary>
+            批量执行选项设置，一般不需要使用该方法<para></para>
+            各数据库 rows 限制不一样，默认设置：200<para></para>
+            若没有事务传入，内部(默认)会自动开启新事务，保证拆包执行的完整性。
+            </summary>
+            <param name="rowsLimit">指定根据 rows 上限数量拆分执行</param>
+            <param name="autoTransaction">是否自动开启事务</param>
             <returns></returns>
         </member>
         <member name="M:FreeSql.IInsertOrUpdate`1.AsTable(System.Func{System.String,System.String})">
@@ -3318,11 +3432,12 @@
             <param name="name">零个或多个过滤器名字</param>
             <returns></returns>
         </member>
-        <member name="M:FreeSql.IUpdateJoin`2.AsTable(System.String)">
+        <member name="M:FreeSql.IUpdateJoin`2.AsTable(System.String,System.String)">
             <summary>
             设置表名
             </summary>
             <param name="tableName"></param>
+            <param name="joinTableName"></param>
             <returns></returns>
         </member>
         <member name="M:FreeSql.IUpdateJoin`2.ToSql">
@@ -3972,6 +4087,11 @@
         <member name="P:FreeSql.Aop.AuditDataReaderEventArgs.Index">
             <summary>
             DataReader 对应的 Index 位置
+            </summary>
+        </member>
+        <member name="P:FreeSql.Aop.AuditDataReaderEventArgs.Property">
+            <summary>
+            DataReader 对应的 PropertyInfo
             </summary>
         </member>
         <member name="P:FreeSql.Aop.AuditDataReaderEventArgs.Value">
@@ -4916,6 +5036,11 @@
             </summary>
             <returns></returns>
         </member>
+        <member name="F:FreeSql.Internal.Utils.ChacheTableEntityFactory">
+            <summary>
+            用于解决多实例情况下的静态集合缓存问题
+            </summary>
+        </member>
         <member name="T:FreeSql.CoreStrings">
             <summary>
                 <para>
@@ -5737,6 +5862,28 @@
             <summary>
             请使用 fsql.InsertDict(dict) 方法插入字典数据
             </summary>
+        </member>
+        <member name="M:FreeSqlGlobalDynamicEntityExtensions.DynamicEntity(FreeSql.ICodeFirst,System.String,System.Attribute[])">
+            <summary>
+            动态构建Class Type
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:FreeSqlGlobalDynamicEntityExtensions.CreateInstance(FreeSql.Internal.Model.TableInfo,System.Collections.Generic.Dictionary{System.String,System.Object})">
+            <summary>
+            根据字典，创建 table 对应的实体对象
+            </summary>
+            <param name="table"></param>
+            <param name="dict"></param>
+            <returns></returns>
+        </member>
+        <member name="M:FreeSqlGlobalDynamicEntityExtensions.CreateDictionary(FreeSql.Internal.Model.TableInfo,System.Object)">
+            <summary>
+            根据实体对象，创建 table 对应的字典
+            </summary>
+            <param name="table"></param>
+            <param name="instance"></param>
+            <returns></returns>
         </member>
         <member name="M:FreeSqlGlobalExpressionCallExtensions.Between(System.DateTime,System.DateTime,System.DateTime)">
             <summary>

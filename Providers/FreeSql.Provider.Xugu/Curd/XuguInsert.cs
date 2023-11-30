@@ -35,7 +35,16 @@ namespace FreeSql.Xugu.Curd
         public override long ExecuteIdentity() => base.SplitExecuteIdentity(_batchValuesLimit > 0 ? _batchValuesLimit : 5000, _batchParameterLimit > 0 ? _batchParameterLimit : 3000);
         public override List<T1> ExecuteInserted() => base.SplitExecuteInserted(_batchValuesLimit > 0 ? _batchValuesLimit : 5000, _batchParameterLimit > 0 ? _batchParameterLimit : 3000);
 
-        protected override long RawExecuteIdentity()
+		public override string ToSql()
+		{
+			return base.ToSqlValuesOrSelectUnionAllExtension102(true, (d, didx, sb) =>
+            {
+                if (didx > 0)
+                    sb.Remove(sb.Length - 3, 1); //批量无逗号
+            }, null);
+		}
+
+		protected override long RawExecuteIdentity()
         {
             var sql = this.ToSql();
             if (string.IsNullOrEmpty(sql)) return 0;
@@ -63,7 +72,7 @@ namespace FreeSql.Xugu.Curd
 
                     //using (var command = cmd.Connection.CreateCommand()) {
                     //command.CommandType = CommandType.Text;
-                    var sqlIdentity = $"SELECT {_commonUtils.QuoteSqlName(identCols.First().Value.Attribute.Name)} FROM {_table.DbName} WHERE \"ROWID\"='{rowid}'";
+                    var sqlIdentity = $"SELECT {_commonUtils.QuoteSqlName(identCols.First().Value.Attribute.Name)} FROM {_commonUtils.QuoteSqlName(TableRuleInvoke())} WHERE \"ROWID\"='{rowid}'";
 
 
                     //command.CommandText = sql;
@@ -91,11 +100,6 @@ namespace FreeSql.Xugu.Curd
 
         protected override List<T1> RawExecuteInserted()
         {
-
-
-
-
-
             var sql = this.ToSql();
             if (string.IsNullOrEmpty(sql)) return null;
 
@@ -119,7 +123,7 @@ namespace FreeSql.Xugu.Curd
                 {
                     var rowid = (cmd as XGCommand).get_insert_rowid();
 
-                    var sqlIdentity = $"SELECT {sbColumn} FROM {_table.DbName} WHERE \"ROWID\"='{rowid}'";
+                    var sqlIdentity = $"SELECT {sbColumn} FROM {_commonUtils.QuoteSqlName(TableRuleInvoke())} WHERE \"ROWID\"='{rowid}'";
 
                     ret = _orm.Ado.Query<T1>(_table.TypeLazy ?? _table.Type, _connection, _transaction, CommandType.Text, sqlIdentity, _commandTimeout, _params);
 
@@ -147,8 +151,6 @@ namespace FreeSql.Xugu.Curd
 
         async protected override Task<long> RawExecuteIdentityAsync(CancellationToken cancellationToken = default)
         {
-
-
             var sql = this.ToSql();
             if (string.IsNullOrEmpty(sql)) return 0;
 
@@ -170,7 +172,7 @@ namespace FreeSql.Xugu.Curd
                 await _orm.Ado.ExecuteNonQueryAsync(_connection, _transaction, CommandType.Text, sql, _commandTimeout, cmd =>
                 {
                     var rowid = (cmd as XGCommand).get_insert_rowid();
-                    var sqlIdentity = $"SELECT {_commonUtils.QuoteSqlName(identCols.First().Value.Attribute.Name)} FROM {_table.DbName} WHERE \"ROWID\"='{rowid}'";
+                    var sqlIdentity = $"SELECT {_commonUtils.QuoteSqlName(identCols.First().Value.Attribute.Name)} FROM {_commonUtils.QuoteSqlName(TableRuleInvoke())} WHERE \"ROWID\"='{rowid}'";
                     if (!long.TryParse(_orm.Ado.ExecuteScalar(CommandType.Text, sqlIdentity, _params).ToString(), out ret))
                     {
 
@@ -193,11 +195,6 @@ namespace FreeSql.Xugu.Curd
         }
         async protected override Task<List<T1>> RawExecuteInsertedAsync(CancellationToken cancellationToken = default)
         {
-
-
-
-
-
             var sql = this.ToSql();
             if (string.IsNullOrEmpty(sql)) return null;
 
@@ -219,7 +216,7 @@ namespace FreeSql.Xugu.Curd
                 {
                     var rowid = (cmd as XGCommand).get_insert_rowid();
 
-                    var sqlIdentity = $"SELECT {sbColumn} FROM {_table.DbName} WHERE \"ROWID\"='{rowid}'";
+                    var sqlIdentity = $"SELECT {sbColumn} FROM {_commonUtils.QuoteSqlName(TableRuleInvoke())} WHERE \"ROWID\"='{rowid}'";
 
                     ret = _orm.Ado.Query<T1>(_table.TypeLazy ?? _table.Type, _connection, _transaction, CommandType.Text, sqlIdentity, _commandTimeout, _params);
                     return Task.CompletedTask;

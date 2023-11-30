@@ -79,7 +79,7 @@ namespace FreeSql.QuestDb
             return null;
         }
 
-        protected override string GetComparisonDDLStatements(params TypeAndName[] objects)
+        protected override string GetComparisonDDLStatements(params TypeSchemaAndName[] objects)
         {
             var sb = new StringBuilder();
             var seqcols = new List<NativeTuple<ColumnInfo, string[], bool>>(); //序列
@@ -87,18 +87,21 @@ namespace FreeSql.QuestDb
             foreach (var obj in objects)
             {
                 if (sb.Length > 0) sb.Append("\r\n");
-                var tb = _commonUtils.GetTableByEntity(obj.entityType);
-                if (tb == null) throw new Exception(CoreStrings.S_Type_IsNot_Migrable(obj.entityType.FullName));
+                var tb = obj.tableSchema;
+                if (tb == null) throw new Exception(CoreStrings.S_Type_IsNot_Migrable(obj.tableSchema.Type.FullName));
                 if (tb.Columns.Any() == false)
-                    throw new Exception(CoreStrings.S_Type_IsNot_Migrable_0Attributes(obj.entityType.FullName));
-                var tbnameArray = _commonUtils.SplitTableName(tb.DbName);
-                var tbname = string.Empty;
-                if (tbnameArray?.Length == 1) tbname = tbnameArray.FirstOrDefault();
-
-                var tboldnameArray = _commonUtils.SplitTableName(tb.DbOldName);
-                var tboldname = string.Empty;
-                if (tboldnameArray?.Length == 1)
-                    tboldname = tboldnameArray.FirstOrDefault();
+                    throw new Exception(CoreStrings.S_Type_IsNot_Migrable_0Attributes(obj.tableSchema.Type.FullName));
+                var tbname = tb.DbName;
+                var tboldname = tb.DbOldName;
+                if (string.IsNullOrEmpty(obj.tableName) == false)
+                {
+                    var tbtmpname = obj.tableName;
+                    if (tbname != tbtmpname)
+                    {
+                        tbname = tbtmpname;
+                        tboldname = null;
+                    }
+                }
 
                 var sbalter = new StringBuilder();
                 var allTable = _orm.Ado.Query<string>(CommandType.Text,
@@ -144,7 +147,7 @@ namespace FreeSql.QuestDb
 
                     sbalter.Remove(sbalter.Length - 1, 1);
                     //是否存在分表
-                    foreach (var propety in obj.entityType.GetProperties())
+                    foreach (var propety in obj.tableSchema.Type.GetProperties())
                     {
                         var timeAttr = propety.GetCustomAttribute<AutoSubtableAttribute>();
                         if (timeAttr != null)

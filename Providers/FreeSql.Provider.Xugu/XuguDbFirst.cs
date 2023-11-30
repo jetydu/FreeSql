@@ -70,7 +70,7 @@ namespace FreeSql.Xugu
                 case "VARCHAR": ret = XGDbType.VarChar; break;
                 case "CLOB": ret = XGDbType.LongVarChar; break;
 
-                //case "timestamp": ret = XGDbType.DateTime; break;
+                case "DATETIME": ret = XGDbType.DateTime; break;
                 //case "timestamptz": ret = XGDbType.DateTime; break;
                 //case "date": ret = XGDbType.Date; break;
                 //case "time": ret = XGDbType.Time; break;
@@ -78,7 +78,7 @@ namespace FreeSql.Xugu
                 //case "interval": ret = XGDbType.Interval; break;
 
                 case "BOOLEAN": ret = XGDbType.Bool; break;
-                //case "bytea": ret = XGDbType.Bytea; break;
+                case "BLOB": ret = XGDbType.LongVarBinary; break;
                 //case "bit": ret = XGDbType.Bool; break;
                 //case "varbit": ret = XGDbType.Varbit; break;
 
@@ -119,18 +119,11 @@ namespace FreeSql.Xugu
                 { (int)XGDbType.Numeric, ("(decimal?)", "decimal.Parse({0})", "{0}.ToString()", "decimal?", typeof(decimal), typeof(decimal?), "{0}.Value", "GetDecimal") },
                 { (int)XGDbType.Real, ("(float?)", "float.Parse({0})", "{0}.ToString()", "float?", typeof(float), typeof(float?), "{0}.Value", "GetFloat") },
                 { (int)XGDbType.Double, ("(double?)", "double.Parse({0})", "{0}.ToString()", "double?", typeof(double), typeof(double?), "{0}.Value", "GetDouble") },
-              
                 { (int)XGDbType.Char, ("", "{0}.Replace(StringifySplit, \"|\")", "{0}.Replace(\"|\", StringifySplit)", "string", typeof(string), typeof(string), "{0}", "GetString") },
                 { (int)XGDbType.VarChar, ("", "{0}.Replace(StringifySplit, \"|\")", "{0}.Replace(\"|\", StringifySplit)", "string", typeof(string), typeof(string), "{0}", "GetString") },
                 { (int)XGDbType.LongVarChar, ("", "{0}.Replace(StringifySplit, \"|\")", "{0}.Replace(\"|\", StringifySplit)", "string", typeof(string), typeof(string), "{0}", "GetString") },
-
-                
                 { (int)XGDbType.DateTime, ("(DateTime?)", "new DateTime({0})", "{0}.ToString()", "DateTime?", typeof(DateTime), typeof(DateTime?), "{0}.Value", "GetValue") },
-              
-
                 { (int)XGDbType.Bool, ("(bool?)", "{0} == \"1\"", "{0} == true ? \"1\" : \"0\"", "bool?", typeof(bool), typeof(bool?), "{0}.Value", "GetBoolean") },
-                 
-                    
             };
 
         public string GetCsConvert(DbColumnInfo column) => _dicDbToCs.TryGetValue(column.DbType, out var trydc) ? (column.IsNullable ? trydc.csConvert : trydc.csConvert.Replace("?", "")) : null;
@@ -391,7 +384,7 @@ where IS_SYS=false and {loc8.ToString().Replace("a.table_name", "ns.SCHEMA_NAME 
                     var index_id = string.Concat(row[2]);
                     var is_unique = string.Concat(row[3]) == "1";
                     var is_primary_key = string.Concat(row[4]) == "1";
-                    var is_clustered = false;//= string.Concat(row[5]) == "1";
+                    //var is_clustered = false;//= string.Concat(row[5]) == "1";
                     var is_desc = false;//string.Concat(row[6]) == "1";
                     //var inkey = string.Concat(row[7]).Split(' ');
                     //var attnum = int.Parse(string.Concat(row[8]));

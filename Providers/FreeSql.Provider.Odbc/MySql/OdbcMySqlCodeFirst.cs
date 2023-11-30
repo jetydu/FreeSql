@@ -75,7 +75,7 @@ namespace FreeSql.Odbc.MySql
             return null;
         }
 
-        protected override string GetComparisonDDLStatements(params TypeAndName[] objects)
+        protected override string GetComparisonDDLStatements(params TypeSchemaAndName[] objects)
         {
             Object<DbConnection> conn = null;
             string database = null;
@@ -89,9 +89,9 @@ namespace FreeSql.Odbc.MySql
                 foreach (var obj in objects)
                 {
                     if (sb.Length > 0) sb.Append("\r\n");
-                    var tb = _commonUtils.GetTableByEntity(obj.entityType);
-                    if (tb == null) throw new Exception(CoreStrings.S_Type_IsNot_Migrable(obj.entityType.FullName));
-                    if (tb.Columns.Any() == false) throw new Exception(CoreStrings.S_Type_IsNot_Migrable_0Attributes(obj.entityType.FullName));
+                    var tb = obj.tableSchema;
+                    if (tb == null) throw new Exception(CoreStrings.S_Type_IsNot_Migrable(obj.tableSchema.Type.FullName));
+                    if (tb.Columns.Any() == false) throw new Exception(CoreStrings.S_Type_IsNot_Migrable_0Attributes(obj.tableSchema.Type.FullName));
                     var tbname = _commonUtils.SplitTableName(tb.DbName);
                     if (tbname?.Length == 1) tbname = new[] { database, tbname[0] };
 
@@ -257,7 +257,7 @@ where a.table_schema in ({0}) and a.table_name in ({1})", tboldname ?? tbname);
 select 
 a.column_name,
 a.index_name 'index_id',
-0 'IsDesc',
+case when a.collation = 'D' then 1 else 0 end 'IsDesc',
 case when a.non_unique = 0 then 1 else 0 end 'IsUnique'
 from information_schema.statistics a
 where a.table_schema IN ({0}) and a.table_name IN ({1}) and a.index_name <> 'PRIMARY'", tboldname ?? tbname);

@@ -89,6 +89,19 @@ namespace FreeSql.Internal
                         field.Append(_common.FieldAsAlias(parent.DbNestedField));
                 }
             }
+            var isGroupAddField = true;
+            var isGroupAddFieldProvider = diymemexp as SelectGroupingProvider;
+            if (isGroupAddFieldProvider?._addFieldAlias == true)
+            {
+                switch (exp.NodeType)
+                {
+                    case ExpressionType.Conditional:
+                    case ExpressionType.Call:
+                        isGroupAddField = false;
+                        isGroupAddFieldProvider._addFieldAlias = false;
+                        break;
+                }
+            }
 
             Func<ExpTSC> getTSC = () => new ExpTSC { _tables = _tables, _tableRule = _tableRule, diymemexp = diymemexp, tbtype = SelectTableInfoType.From, isQuoteName = true, isDisableDiyParse = false, style = ExpressionStyle.Where, whereGlobalFilter = whereGlobalFilter, dbParams = select?._params }; //#462 添加 DbParams 解决
             switch (exp.NodeType)
@@ -542,6 +555,7 @@ namespace FreeSql.Internal
             field.Append(", ").Append(parent.DbField);
             LocalSetFieldAlias(ref index, false);
             if (parent.CsType == null && exp.Type.IsValueType) parent.CsType = exp.Type;
+            if (isGroupAddField == false && isGroupAddFieldProvider != null) isGroupAddFieldProvider._addFieldAlias = true;
             return false;
         }
         public object ReadAnonymous(ReadAnonymousTypeInfo parent, DbDataReader dr, ref int index, bool notRead, ReadAnonymousDbValueRef dbValue, int rowIndex,
@@ -556,7 +570,7 @@ namespace FreeSql.Internal
                         return Utils.GetDataReaderValue(parent.Property.PropertyType, null);
                     return Utils.GetDataReaderValue(parent.CsType, null);
                 }
-                object objval = Utils.InternalDataReaderGetValue(_common, dr, ++index); // dr.GetValue(++index);
+                object objval = Utils.InternalDataReaderGetValue(_common, dr, ++index, parent.Property); // dr.GetValue(++index);
                 if (dbValue != null) dbValue.DbValue = objval == DBNull.Value ? null : objval;
                 if (parent.CsType != parent.MapType)
                     objval = Utils.GetDataReaderValue(parent.MapType, objval);
@@ -810,6 +824,7 @@ namespace FreeSql.Internal
                         var rightBool = ExpressionLambdaToSql(rightExp, tsc);
                         if (SearchColumnByField(tsc._tables, tsc.currentTable, rightBool) != null) rightBool = $"{rightBool} = {formatSql(true, null, null, null)}";
                         else rightBool = GetBoolString(rightBool);
+                        if (_common._orm?.Ado?.DataType == DataType.QuestDb) return $"(({leftBool}) {oper} ({rightBool}))";
                         return $"({leftBool} {oper} {rightBool})";
                     }
                     return $"({ExpressionLambdaToSql(leftExp, tsc)} {oper} {ExpressionLambdaToSql(rightExp, tsc)})";
@@ -828,10 +843,16 @@ namespace FreeSql.Internal
                             (int)(rightExp as ConstantExpression).Value == 0)
                             return ExpressionBinary(oper, leftExpCall.Arguments[0], leftExpCall.Arguments[1], tsc);
                     }
-                    var exptb = _common.GetTableByEntity(leftExp.Type);
-                    if (exptb?.Properties.Any() == true) leftExp = Expression.MakeMemberAccess(leftExp, exptb.Properties[(exptb.Primarys.FirstOrDefault() ?? exptb.Columns.FirstOrDefault().Value)?.CsName]);
-                    exptb = _common.GetTableByEntity(leftExp.Type);
-                    if (exptb?.Properties.Any() == true) rightExp = Expression.MakeMemberAccess(rightExp, exptb.Properties[(exptb.Primarys.FirstOrDefault() ?? exptb.Columns.FirstOrDefault().Value).CsName]);
+                    if (Utils.dicExecuteArrayRowReadClassOrTuple.ContainsKey(leftExp.Type) == false && Utils.TypeHandlers.ContainsKey(leftExp.Type) == false)
+                    {
+                        var exptb = _common.GetTableByEntity(leftExp.Type);
+                        if (exptb?.Properties.Any() == true) leftExp = Expression.MakeMemberAccess(leftExp, exptb.Properties[(exptb.Primarys.FirstOrDefault() ?? exptb.Columns.FirstOrDefault().Value)?.CsName]);
+                    }
+                    if (Utils.dicExecuteArrayRowReadClassOrTuple.ContainsKey(rightExp.Type) == false && Utils.TypeHandlers.ContainsKey(rightExp.Type) == false)
+                    {
+                        var exptb = _common.GetTableByEntity(rightExp.Type);
+                        if (exptb?.Properties.Any() == true) rightExp = Expression.MakeMemberAccess(rightExp, exptb.Properties[(exptb.Primarys.FirstOrDefault() ?? exptb.Columns.FirstOrDefault().Value).CsName]);
+                    }
                     break;
             }
 
@@ -927,6 +948,7 @@ namespace FreeSql.Internal
                 case "OR":
                     if (leftMapColumn != null) left = $"{left} = {formatSql(true, null, null, null)}";
                     else left = GetBoolString(left);
+                    if (rightMapColumn == null) rightMapColumn = SearchColumnByField(tsc._tables, tsc.currentTable, right);
                     if (rightMapColumn != null) right = $"{right} = {formatSql(true, null, null, null)}";
                     else right = GetBoolString(right);
                     break;

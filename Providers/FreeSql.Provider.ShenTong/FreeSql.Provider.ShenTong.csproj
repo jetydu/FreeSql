@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFrameworks>netstandard2.0;net45;net40</TargetFrameworks>
@@ -15,11 +15,16 @@
 		<Title>$(AssemblyName)</Title>
 		<IsPackable>true</IsPackable>
 		<GenerateAssemblyInfo>true</GenerateAssemblyInfo>
-		<Version>3.2.700</Version>
+		<Version>3.2.806-preview20231128</Version>
+		<PackageReadmeFile>readme.md</PackageReadmeFile>
 	</PropertyGroup>
 
 	<ItemGroup>
+		<None Include="../../readme.md" Pack="true" PackagePath="\"/>
 		<None Include="../../logo.png" Pack="true" PackagePath="\" />
+	</ItemGroup>
+	
+	<ItemGroup>
 		<None Include="lib\System.Data.OscarClient.dll" Pack="true" PackagePath="\lib\net45\" />
 		<None Include="lib\System.Data.OscarClient.dll" Pack="true" PackagePath="\lib\net40\" />
 		<None Include="lib\Mono.Security.dll" Pack="true" PackagePath="\lib\net45\" />

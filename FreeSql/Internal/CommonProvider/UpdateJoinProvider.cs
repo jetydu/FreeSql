@@ -45,9 +45,20 @@ namespace FreeSql.Internal.CommonProvider
             _query2Provider = _query2 as Select2Provider<T1, T2>;
 
             _query2Provider._where.Clear();
+
+            var t2globalFilterBefore = _commonExpression.GetWhereCascadeSql(_query2Provider._tables[1], _updateProvider._whereGlobalFilter.Where(a => a.Before == true), true);
+            if (string.IsNullOrWhiteSpace(t2globalFilterBefore) == false)
+                _query2Provider._where.Append(" AND ").Append(t2globalFilterBefore);
+
             _query2.Where(on);
+
+            var t2globalFilter = _commonExpression.GetWhereCascadeSql(_query2Provider._tables[1], _updateProvider._whereGlobalFilter.Where(a => a.Before == false), true);
+            if (string.IsNullOrWhiteSpace(t2globalFilter) == false)
+                _query2Provider._where.Append(" AND ").Append(t2globalFilter);
+
             _joinOn = _query2Provider._where.ToString();
             if (_joinOn.StartsWith(" AND ")) _joinOn = _joinOn.Substring(5);
+            _query2Provider._where.Clear();
 
             _updateProvider.Where("1=1");
         }
@@ -87,9 +98,19 @@ namespace FreeSql.Internal.CommonProvider
         }
 
         #region proxy IUpdate
-        public IUpdateJoin<T1, T2> AsTable(string tableName)
+        public IUpdateJoin<T1, T2> AsTable(string tableName, string joinTableName)
         {
-            _update.AsTable(tableName);
+            if (string.IsNullOrWhiteSpace(tableName) == false)
+                _update.AsTable(tableName);
+            if (string.IsNullOrWhiteSpace(joinTableName) == false)
+            {
+                _query2Provider._tableRules.Clear();
+                _query2Provider._tableRules.Add((t, old) =>
+                {
+                    if (t == typeof(T2)) return joinTableName;
+                    return old;
+                });
+            }
             return this;
         }
         public IUpdateJoin<T1, T2> WithConnection(DbConnection connection)
@@ -148,6 +169,7 @@ namespace FreeSql.Internal.CommonProvider
         public IUpdateJoin<T1, T2> Set(Expression<Func<T1, T2, bool>> exp) => SetIf(true, exp);
         public IUpdateJoin<T1, T2> SetIf(bool condition, Expression<Func<T1, T2, bool>> exp)
         {
+            if (condition == false) return this;
             var body = exp?.Body;
             var nodeType = body?.NodeType;
             if (nodeType == ExpressionType.Convert)
@@ -198,7 +220,8 @@ namespace FreeSql.Internal.CommonProvider
                 case DataType.ShenTong:
                     break;
                 default:
-                    columnSql = $"{_query2Provider._tables[0].Alias}.{columnSql}";  //set a.name = b.name
+                    var tbalias = _query2Provider._tables.Where(tb => tb.Table == col.Table).FirstOrDefault()?.Alias ?? _query2Provider._tables[0].Alias;
+                    columnSql = $"{tbalias}.{columnSql}";  //set a.name = b.name
                     break;
             }
 
@@ -278,6 +301,7 @@ namespace FreeSql.Internal.CommonProvider
         public string ToSql()
         {
             _updateProvider._interceptSql = InterceptSql;
+            _updateProvider._tableAlias = _query2Provider._tables[0].Alias;
             try
             {
                 return _update.ToSql();
@@ -285,11 +309,13 @@ namespace FreeSql.Internal.CommonProvider
             finally
             {
                 _updateProvider._interceptSql = null;
+                _updateProvider._tableAlias = null;
             }
         }
         public int ExecuteAffrows()
         {
             _updateProvider._interceptSql = InterceptSql;
+            _updateProvider._tableAlias = _query2Provider._tables[0].Alias;
             try
             {
                 return _update.ExecuteAffrows();
@@ -297,6 +323,7 @@ namespace FreeSql.Internal.CommonProvider
             finally
             {
                 _updateProvider._interceptSql = null;
+                _updateProvider._tableAlias = null;
             }
         }
 #if net40
@@ -304,6 +331,7 @@ namespace FreeSql.Internal.CommonProvider
         async public Task<int> ExecuteAffrowsAsync(CancellationToken cancellationToken = default)
         {
             _updateProvider._interceptSql = InterceptSql;
+            _updateProvider._tableAlias = _query2Provider._tables[0].Alias;
             try
             {
                 return await _update.ExecuteAffrowsAsync(cancellationToken);
@@ -311,6 +339,7 @@ namespace FreeSql.Internal.CommonProvider
             finally
             {
                 _updateProvider._interceptSql = null;
+                _updateProvider._tableAlias = null;
             }
         }
 #endif

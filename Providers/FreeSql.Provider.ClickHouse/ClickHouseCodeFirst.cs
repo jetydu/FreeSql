@@ -85,7 +85,7 @@ namespace FreeSql.ClickHouse
             return null;
         }
 
-        protected override string GetComparisonDDLStatements(params TypeAndName[] objects)
+        protected override string GetComparisonDDLStatements(params TypeSchemaAndName[] objects)
         {
             Object<DbConnection> conn = null;
             string database = null;
@@ -100,11 +100,11 @@ namespace FreeSql.ClickHouse
                 {
                     if (sb.Length > 0)
                         sb.Append("\r\n");
-                    var tb = _commonUtils.GetTableByEntity(obj.entityType);
+                    var tb = obj.tableSchema;
                     if (tb == null)
-                        throw new Exception(CoreStrings.S_Type_IsNot_Migrable(obj.entityType.FullName));
+                        throw new Exception(CoreStrings.S_Type_IsNot_Migrable(obj.tableSchema.Type.FullName));
                     if (tb.Columns.Any() == false)
-                        throw new Exception(CoreStrings.S_Type_IsNot_Migrable_0Attributes(obj.entityType.FullName));
+                        throw new Exception(CoreStrings.S_Type_IsNot_Migrable_0Attributes(obj.tableSchema.Type.FullName));
                     var tbname = _commonUtils.SplitTableName(tb.DbName);
                     if (tbname?.Length == 1)
                         tbname = new[] { database, tbname[0] };
@@ -199,7 +199,7 @@ namespace FreeSql.ClickHouse
                                 sb.Remove(sb.Length - 2, 2);
                                 sb.Append(" )");
                                 sb.Append(" \r\nPRIMARY KEY ");
-                                sb.Append(ls);
+                                sb.Append($"({ls})   ");
                                 sb.Remove(sb.Length - 2, 2).Append(",");
                             }
 
@@ -322,7 +322,7 @@ where a.database in ({0}) and a.table in ({1})", tboldname ?? tbname);
                             //先判断表中有没此字段的索引
                             if (indexCollect.Any(c =>
                                     RemoveSpaceComparison(c.expr,
-                                        string.Join(',', uk.Columns.Select(i => i.Column.CsName)))))
+                                        string.Join(",", uk.Columns.Select(i => i.Column.CsName)))))
                             {
                                 //有这个字段的索引，但是名称不一样 修改名 , ClickHouse不支持修改列
                                 //if (!indexCollect.Where(c => c.name == uk.Name).Any())
@@ -415,7 +415,7 @@ where a.database in ({0}) and a.table in ({1})", tboldname ?? tbname);
                         sb.Remove(sb.Length - 2, 2);
                         sb.Append(" )");
                         sb.Append(" \r\nPRIMARY KEY ");
-                        sb.Append(ls);
+                        sb.Append($"({ls})   ");
                         sb.Remove(sb.Length - 2, 2).Append(",");
                     }
 
@@ -455,7 +455,8 @@ where a.database in ({0}) and a.table in ({1})", tboldname ?? tbname);
                         .Append(_commonUtils.QuoteSqlName(tbname[0], tbname[1])).Append(";\r\n");
                 }
 
-                return sb.Length == 0 ? null : sb.ToString();
+                var res = sb.Length == 0 ? null : sb.ToString();
+                return res;
             }
             finally
             {
@@ -506,17 +507,17 @@ where a.database in ({0}) and a.table in ({1})", tboldname ?? tbname);
                 }
             }
 
-            string CkNullablePrimaryAdapter(string dbType, bool isPrimary)
-            {
-                return isPrimary
-                    ? dbType.Replace("Nullable(", "").Replace(")", "")
-                    : dbType.Replace(" NOT NULL", "");
-            }
             string CkNullableAdapter(string dbType, bool isPrimary)
             {
-                return isPrimary
-                    ? dbType.Replace("Nullable(", "").Replace(")","").Replace(" NOT NULL", "")
-                    : dbType.Replace(" NOT NULL", "");
+                if (isPrimary)
+                {
+                    if (dbType.Contains("Nullable")) 
+                        return dbType.Replace("Nullable(", "")
+                            .Replace(")", "")
+                            .Replace(" NOT NULL", "");
+                    return dbType;
+                }
+                return dbType.Replace(" NOT NULL", "");
             }
 
 

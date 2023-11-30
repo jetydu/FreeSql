@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<OutputType>Exe</OutputType>
@@ -13,8 +13,14 @@
 		<PackageProjectUrl>https://github.com/2881099/FreeSql</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/2881099/FreeSql</RepositoryUrl>
 		<PackageTags>FreeSql DbFirst 实体生成器</PackageTags>
-		<Version>3.2.700</Version>
+		<Version>3.2.806-preview20231128</Version>
+		<PackageReadmeFile>readme.md</PackageReadmeFile>
 	</PropertyGroup>
+
+	<ItemGroup>
+		<None Include="../../readme.md" Pack="true" PackagePath="\"/>
+		<None Include="../../logo.png" Pack="true" PackagePath="\" />
+	</ItemGroup>
 
 	<ItemGroup>
 		<PackageReference Include="Colorful.Console" Version="1.2.9" />
@@ -31,6 +37,11 @@
 	<ItemGroup>
 		<Reference Include="System.Data.OscarClient">
 			<HintPath>..\..\Providers\FreeSql.Provider.ShenTong\lib\System.Data.OscarClient.dll</HintPath>
+		</Reference>
+	</ItemGroup>
+	<ItemGroup>
+		<Reference Include="Kdbndp">
+			<HintPath>..\..\Providers\FreeSql.Provider.KingbaseES\lib\Kdbndp.dll</HintPath>
 		</Reference>
 	</ItemGroup>
 

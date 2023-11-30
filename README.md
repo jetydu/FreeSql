@@ -1,6 +1,6 @@
-<h1 align="center"> 🦄 FreeSql </h1><div align="center">
+<h1 align="center"> 🦄 FreeSql, The first AOT ORM!</h1><div align="center">
 
-FreeSql is a powerful O/RM component, supports .NET Core 2.1+, .NET Framework 4.0+, and Xamarin.
+FreeSql is a powerful O/RM component, supports .NET Core 2.1+, .NET Framework 4.0+, Xamarin, And AOT.
 
 [![Member project of .NET Core Community](https://img.shields.io/badge/member%20project%20of-NCC-9e20c9.svg)](https://github.com/dotnetcore) 
 [![nuget](https://img.shields.io/nuget/v/FreeSql.svg?style=flat-square)](https://www.nuget.org/packages/FreeSql) 
@@ -28,7 +28,7 @@ QQ Groups：**561616019(available)**、4336577(full)、8578575(full)、52508226(
 
 | |
 | - |
-| [Get started](https://www.cnblogs.com/FreeSql/p/11531300.html)&nbsp;&nbsp;\|&nbsp;&nbsp;[Select](https://github.com/dotnetcore/FreeSql/wiki/Query-Data)&nbsp;&nbsp;\|&nbsp;&nbsp;[Update](https://github.com/dotnetcore/FreeSql/wiki/Update-Data)&nbsp;&nbsp;\|&nbsp;&nbsp;[Insert](https://github.com/dotnetcore/FreeSql/wiki/Insert-Data)&nbsp;&nbsp;\|&nbsp;&nbsp;[Delete](https://github.com/dotnetcore/FreeSql/wiki/Delete-Data)&nbsp;&nbsp;\|&nbsp;&nbsp;[FAQ](https://github.com/dotnetcore/FreeSql/wiki/%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98)&nbsp;&nbsp;|
+| [Get started](https://github.com/dotnetcore/FreeSql/wiki/Getting-Started)&nbsp;&nbsp;\|&nbsp;&nbsp;[Select](https://github.com/dotnetcore/FreeSql/wiki/Query-Data)&nbsp;&nbsp;\|&nbsp;&nbsp;[Update](https://github.com/dotnetcore/FreeSql/wiki/Update-Data)&nbsp;&nbsp;\|&nbsp;&nbsp;[Insert](https://github.com/dotnetcore/FreeSql/wiki/Insert-Data)&nbsp;&nbsp;\|&nbsp;&nbsp;[Delete](https://github.com/dotnetcore/FreeSql/wiki/Delete-Data)&nbsp;&nbsp;\|&nbsp;&nbsp;[FAQ](https://github.com/dotnetcore/FreeSql/wiki/%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98)&nbsp;&nbsp;|
 | [Expression](https://github.com/dotnetcore/FreeSql/wiki/%e8%a1%a8%e8%be%be%e5%bc%8f%e5%87%bd%e6%95%b0)&nbsp;&nbsp;\|&nbsp;&nbsp;[CodeFirst](https://github.com/dotnetcore/FreeSql/wiki/CodeFirst)&nbsp;&nbsp;\|&nbsp;&nbsp;[DbFirst](https://github.com/2881099/FreeSql/wiki/DbFirst)&nbsp;&nbsp;\|&nbsp;&nbsp;[Filters](https://github.com/dotnetcore/FreeSql/wiki/%e8%bf%87%e6%bb%a4%e5%99%a8)&nbsp;&nbsp;\|&nbsp;&nbsp;[AOP](https://github.com/2881099/FreeSql/wiki/AOP)&nbsp;&nbsp;|
 | [Repository](https://github.com/dotnetcore/FreeSql/wiki/Repository-layer)&nbsp;&nbsp;\|&nbsp;&nbsp;[UnitOfWork](https://github.com/dotnetcore/FreeSql/wiki/Unit-of-Work)&nbsp;&nbsp;\|&nbsp;&nbsp;[DbContext](https://github.com/dotnetcore/FreeSql/wiki/DbContext)&nbsp;&nbsp;\|&nbsp;&nbsp;[ADO](https://github.com/2881099/FreeSql/wiki/ADO)&nbsp;&nbsp;|
 | [Read/Write](https://github.com/dotnetcore/FreeSql/wiki/%e8%af%bb%e5%86%99%e5%88%86%e7%a6%bb)&nbsp;&nbsp;\|&nbsp;&nbsp;[Splitting Table](https://github.com/dotnetcore/FreeSql/wiki/%e5%88%86%e8%a1%a8%e5%88%86%e5%ba%93)&nbsp;&nbsp;\|&nbsp;&nbsp;[Hide tech](https://github.com/dotnetcore/FreeSql/wiki/%E9%AA%9A%E6%93%8D%E4%BD%9C)&nbsp;&nbsp;\|&nbsp;&nbsp;[*Update Notes*](https://github.com/dotnetcore/FreeSql/wiki/%e6%9b%b4%e6%96%b0%e6%97%a5%e5%bf%97)&nbsp;&nbsp;|

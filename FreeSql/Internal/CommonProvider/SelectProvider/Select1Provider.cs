@@ -213,11 +213,10 @@ namespace FreeSql.Internal.CommonProvider
         
         public ISelect<T1> UnionAll(params ISelect<T1>[] querys)
         {
-            var sql1 = this.ToSql();
             var ret = (_orm as BaseDbProvider).CreateSelectProvider<T1>(null) as Select1Provider<T1>;
-            var sb = new StringBuilder().Append(this.ToSql());
+            var sb = new StringBuilder().Append(LocalGetQuerySql(this));
             foreach (var select2 in querys)
-                sb.Append(" \r\nUNION ALL \r\n").Append(select2.ToSql());
+                sb.Append(" \r\nUNION ALL \r\n").Append(LocalGetQuerySql(select2));
             ret.WithSql(sb.ToString());
             sb.Clear();
             ret._commandTimeout = _commandTimeout;
@@ -229,6 +228,17 @@ namespace FreeSql.Internal.CommonProvider
             ret._tables[0] = _tables[0];
             ret._params = _params;
             return ret;
+
+            string LocalGetQuerySql(ISelect<T1> query)
+            {
+                var query2 = query as Select0Provider;
+                if (query2._diymemexpWithTempQuery == null ||
+                    query2.IsDefaultSqlContent == false) return query.ToSql();
+				var sql2 = query2._tableRule(query2._tables[0].Table.Type, null);
+				if (sql2.StartsWith("(") && sql2.EndsWith(")")) sql2 = sql2.Substring(1, sql2.Length - 2);
+				if (sql2.StartsWith(" \r\n")) sql2 = sql2.Substring(3);
+                return sql2;
+			}
         }
 
         public ISelectGrouping<TKey, T1> GroupBy<TKey>(Expression<Func<T1, TKey>> columns)
@@ -287,6 +297,7 @@ namespace FreeSql.Internal.CommonProvider
             public Dictionary<string, IncludeManyNewInit> Childs { get; } = new Dictionary<string, IncludeManyNewInit>();
             public Expression CurrentExpression { get; }
             public bool IsOutputPrimary { get; set; }
+            public List<ColumnInfo> OutputColumns { get; } = new List<ColumnInfo>();
             public IncludeManyNewInit(TableInfo table, Expression currentExpression)
             {
                 this.Table = table;
@@ -313,20 +324,26 @@ namespace FreeSql.Internal.CommonProvider
             {
                 var curIncNewInit = incNewInit;
                 Expression curParmExp = parmExp;
-                for (var a = 0; a < inc.Value.Length - 1; a++)
+                for (var a = 0; a < inc.Value.Item1.Length - 1; a++)
                 {
-                    curParmExp = Expression.MakeMemberAccess(parmExp, inc.Value[a].Member);
-                    if (curIncNewInit.Childs.ContainsKey(inc.Value[a].Member.Name) == false)
-                        curIncNewInit.Childs.Add(inc.Value[a].Member.Name, curIncNewInit = new IncludeManyNewInit(_orm.CodeFirst.GetTableByEntity(inc.Value[a].Type), curParmExp));
+                    curParmExp = Expression.MakeMemberAccess(parmExp, inc.Value.Item1[a].Member);
+                    if (curIncNewInit.Childs.ContainsKey(inc.Value.Item1[a].Member.Name) == false)
+                        curIncNewInit.Childs.Add(inc.Value.Item1[a].Member.Name, curIncNewInit = new IncludeManyNewInit(_orm.CodeFirst.GetTableByEntity(inc.Value.Item1[a].Type), curParmExp));
                     else
-                        curIncNewInit = curIncNewInit.Childs[inc.Value[a].Member.Name];
+                        curIncNewInit = curIncNewInit.Childs[inc.Value.Item1[a].Member.Name];
                 }
                 curIncNewInit.IsOutputPrimary = true;
+                var outcols = inc.Value.Item2.Columns.Where(a => a.Attribute.IsPrimary == false).ToArray();
+                if (outcols.Any()) curIncNewInit.OutputColumns.AddRange(outcols);
             }
             MemberInitExpression GetIncludeManyNewInitExpression(IncludeManyNewInit imni)
             {
                 var bindings = new List<MemberBinding>();
-                if (imni.IsOutputPrimary) bindings.AddRange(imni.Table.Primarys.Select(a => Expression.Bind(imni.Table.Properties[a.CsName], Expression.MakeMemberAccess(imni.CurrentExpression, imni.Table.Properties[a.CsName]))));
+                if (imni.IsOutputPrimary)
+                {
+                    bindings.AddRange(imni.Table.Primarys.Select(a => Expression.Bind(imni.Table.Properties[a.CsName], Expression.MakeMemberAccess(imni.CurrentExpression, imni.Table.Properties[a.CsName]))));
+                    if (imni.OutputColumns.Any()) bindings.AddRange(imni.OutputColumns.Select(a => Expression.Bind(imni.Table.Properties[a.CsName], Expression.MakeMemberAccess(imni.CurrentExpression, imni.Table.Properties[a.CsName]))));
+                }
                 if (imni.Childs.Any()) bindings.AddRange(imni.Childs.Select(a => Expression.Bind(imni.Table.Properties[a.Key], GetIncludeManyNewInitExpression(a.Value))));
                 var pgarrayToManys = imni.Table.GetAllTableRef().Select(tr =>
                 {
@@ -1514,7 +1531,7 @@ namespace FreeSql.Internal.CommonProvider
             for (var a = 0; a < members.Count; a++) includeValue[a] = members[a];
             includeValue[includeValue.Length - 1] = expBody as MemberExpression;
             var includeKey = $"{string.Join(".", includeValue.Select(a => a.Member.Name))}";
-            if (_includeInfo.ContainsKey(includeKey) == false) _includeInfo.Add(includeKey, includeValue);
+            if (_includeInfo.ContainsKey(includeKey) == false) _includeInfo.Add(includeKey, NativeTuple.Create(includeValue, tbref));
             return this;
         }
 
@@ -1577,20 +1594,26 @@ namespace FreeSql.Internal.CommonProvider
             {
                 var curIncNewInit = incNewInit;
                 Expression curParmExp = parmExp;
-                for (var a = 0; a < inc.Value.Length - 1; a++)
+                for (var a = 0; a < inc.Value.Item1.Length - 1; a++)
                 {
-                    curParmExp = Expression.MakeMemberAccess(parmExp, inc.Value[a].Member);
-                    if (curIncNewInit.Childs.ContainsKey(inc.Value[a].Member.Name) == false)
-                        curIncNewInit.Childs.Add(inc.Value[a].Member.Name, curIncNewInit = new IncludeManyNewInit(_orm.CodeFirst.GetTableByEntity(inc.Value[a].Type), curParmExp));
+                    curParmExp = Expression.MakeMemberAccess(parmExp, inc.Value.Item1[a].Member);
+                    if (curIncNewInit.Childs.ContainsKey(inc.Value.Item1[a].Member.Name) == false)
+                        curIncNewInit.Childs.Add(inc.Value.Item1[a].Member.Name, curIncNewInit = new IncludeManyNewInit(_orm.CodeFirst.GetTableByEntity(inc.Value.Item1[a].Type), curParmExp));
                     else
-                        curIncNewInit = curIncNewInit.Childs[inc.Value[a].Member.Name];
+                        curIncNewInit = curIncNewInit.Childs[inc.Value.Item1[a].Member.Name];
                 }
                 curIncNewInit.IsOutputPrimary = true;
+                var outcols = inc.Value.Item2.Columns.Where(a => a.Attribute.IsPrimary == false).ToArray();
+                if (outcols.Any()) curIncNewInit.OutputColumns.AddRange(outcols);
             }
             MemberInitExpression GetIncludeManyNewInitExpression(IncludeManyNewInit imni)
             {
                 var bindings = new List<MemberBinding>();
-                if (imni.IsOutputPrimary) bindings.AddRange(imni.Table.Primarys.Select(a => Expression.Bind(imni.Table.Properties[a.CsName], Expression.MakeMemberAccess(imni.CurrentExpression, imni.Table.Properties[a.CsName]))));
+                if (imni.IsOutputPrimary)
+                {
+                    bindings.AddRange(imni.Table.Primarys.Select(a => Expression.Bind(imni.Table.Properties[a.CsName], Expression.MakeMemberAccess(imni.CurrentExpression, imni.Table.Properties[a.CsName]))));
+                    if (imni.OutputColumns.Any()) bindings.AddRange(imni.OutputColumns.Select(a => Expression.Bind(imni.Table.Properties[a.CsName], Expression.MakeMemberAccess(imni.CurrentExpression, imni.Table.Properties[a.CsName]))));
+                }
                 if (imni.Childs.Any()) bindings.AddRange(imni.Childs.Select(a => Expression.Bind(imni.Table.Properties[a.Key], GetIncludeManyNewInitExpression(a.Value))));
                 var pgarrayToManys = imni.Table.GetAllTableRef().Select(tr =>
                 {
