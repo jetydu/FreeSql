@@ -350,156 +350,97 @@ namespace FreeSql.Internal.CommonProvider
                 ret[a] = _source.GetRange(a * takeMax, Math.Min(takeMax, _source.Count - a * takeMax));
             return ret;
         }
-        protected virtual int SplitExecuteAffrows(int valuesLimit, int parameterLimit)
+        protected virtual void SplitExecute(int valuesLimit, int parameterLimit, string traceName, Action execute)
         {
-            var ss = SplitSource(valuesLimit, parameterLimit);
+			var ss = SplitSource(valuesLimit, parameterLimit);
+			if (ss.Length <= 1)
+			{
+				if (_source?.Any() == true) _batchProgress?.Invoke(new BatchProgressStatus<T1>(_source, 1, 1));
+                execute();
+				ClearData();
+				return;
+			}
+			if (_transaction == null)
+			{
+				var threadTransaction = _orm.Ado.TransactionCurrentThread;
+				if (threadTransaction != null) this.WithTransaction(threadTransaction);
+			}
+
+			var before = new Aop.TraceBeforeEventArgs(traceName, null);
+			_orm.Aop.TraceBeforeHandler?.Invoke(this, before);
+			Exception exception = null;
+			try
+			{
+				if (_transaction != null || _batchAutoTransaction == false)
+				{
+					for (var a = 0; a < ss.Length; a++)
+					{
+						_source = ss[a];
+						_batchProgress?.Invoke(new BatchProgressStatus<T1>(_source, a + 1, ss.Length));
+                        execute();
+					}
+				}
+				else
+				{
+					if (_orm.Ado.MasterPool == null) throw new Exception(CoreStrings.MasterPool_IsNull_UseTransaction);
+					using (var conn = _orm.Ado.MasterPool.Get())
+					{
+						_transaction = conn.Value.BeginTransaction();
+						var transBefore = new Aop.TraceBeforeEventArgs("BeginTransaction", null);
+						_orm.Aop.TraceBeforeHandler?.Invoke(this, transBefore);
+						try
+						{
+							for (var a = 0; a < ss.Length; a++)
+							{
+								_source = ss[a];
+								_batchProgress?.Invoke(new BatchProgressStatus<T1>(_source, a + 1, ss.Length));
+								execute();
+							}
+							_transaction.Commit();
+							_orm.Aop.TraceAfterHandler?.Invoke(this, new Aop.TraceAfterEventArgs(transBefore, CoreStrings.Commit, null));
+						}
+						catch (Exception ex)
+						{
+							_transaction.Rollback();
+							_orm.Aop.TraceAfterHandler?.Invoke(this, new Aop.TraceAfterEventArgs(transBefore, CoreStrings.RollBack, ex));
+							throw;
+						}
+						_transaction = null;
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				exception = ex;
+				throw;
+			}
+			finally
+			{
+				var after = new Aop.TraceAfterEventArgs(before, null, exception);
+				_orm.Aop.TraceAfterHandler?.Invoke(this, after);
+			}
+			ClearData();
+		}
+
+		protected int SplitExecuteAffrows(int valuesLimit, int parameterLimit)
+        {
             var ret = 0;
-            if (ss.Length <= 1)
-            {
-                if (_source?.Any() == true) _batchProgress?.Invoke(new BatchProgressStatus<T1>(_source, 1, 1));
-                ret = this.RawExecuteAffrows();
-                ClearData();
-                return ret;
-            }
-            if (_transaction == null)
-            {
-                var threadTransaction = _orm.Ado.TransactionCurrentThread;
-                if (threadTransaction != null) this.WithTransaction(threadTransaction);
-            }
-
-            var before = new Aop.TraceBeforeEventArgs("SplitExecuteAffrows", null);
-            _orm.Aop.TraceBeforeHandler?.Invoke(this, before);
-            Exception exception = null;
-            try
-            {
-                if (_transaction != null || _batchAutoTransaction == false)
-                {
-                    for (var a = 0; a < ss.Length; a++)
-                    {
-                        _source = ss[a];
-                        _batchProgress?.Invoke(new BatchProgressStatus<T1>(_source, a + 1, ss.Length));
-                        ret += this.RawExecuteAffrows();
-                    }
-                }
-                else
-                {
-                    if (_orm.Ado.MasterPool == null) throw new Exception(CoreStrings.MasterPool_IsNull_UseTransaction);
-                    using (var conn = _orm.Ado.MasterPool.Get())
-                    {
-                        _transaction = conn.Value.BeginTransaction();
-                        var transBefore = new Aop.TraceBeforeEventArgs("BeginTransaction", null);
-                        _orm.Aop.TraceBeforeHandler?.Invoke(this, transBefore);
-                        try
-                        {
-                            for (var a = 0; a < ss.Length; a++)
-                            {
-                                _source = ss[a];
-                                _batchProgress?.Invoke(new BatchProgressStatus<T1>(_source, a + 1, ss.Length));
-                                ret += this.RawExecuteAffrows();
-                            }
-                            _transaction.Commit();
-                            _orm.Aop.TraceAfterHandler?.Invoke(this, new Aop.TraceAfterEventArgs(transBefore, CoreStrings.Commit, null));
-                        }
-                        catch (Exception ex)
-                        {
-                            _transaction.Rollback();
-                            _orm.Aop.TraceAfterHandler?.Invoke(this, new Aop.TraceAfterEventArgs(transBefore, CoreStrings.RollBack, ex));
-                            throw;
-                        }
-                        _transaction = null;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                exception = ex;
-                throw;
-            }
-            finally
-            {
-                var after = new Aop.TraceAfterEventArgs(before, null, exception);
-                _orm.Aop.TraceAfterHandler?.Invoke(this, after);
-            }
-            ClearData();
+            SplitExecute(valuesLimit, parameterLimit, "SplitExecuteAffrows", () =>
+                ret += this.RawExecuteAffrows()
+            );
             return ret;
         }
+		protected List<TReturn> SplitExecuteUpdated<TReturn>(int valuesLimit, int parameterLimit, IEnumerable<ColumnInfo> columns)
+		{
+			var ret = new List<TReturn>();
+			SplitExecute(valuesLimit, parameterLimit, "SplitExecuteUpdated", () =>
+				ret.AddRange(this.RawExecuteUpdated<TReturn>(columns ?? _table.ColumnsByPosition))
+			);
+			return ret;
+		}
+		#endregion
 
-        protected virtual List<T1> SplitExecuteUpdated(int valuesLimit, int parameterLimit)
-        {
-            var ss = SplitSource(valuesLimit, parameterLimit);
-            var ret = new List<T1>();
-            if (ss.Length <= 1)
-            {
-                if (_source?.Any() == true) _batchProgress?.Invoke(new BatchProgressStatus<T1>(_source, 1, 1));
-                ret = this.RawExecuteUpdated();
-                ClearData();
-                return ret;
-            }
-            if (_transaction == null)
-            {
-                var threadTransaction = _orm.Ado.TransactionCurrentThread;
-                if (threadTransaction != null) this.WithTransaction(threadTransaction);
-            }
-
-            var before = new Aop.TraceBeforeEventArgs("SplitExecuteUpdated", null);
-            _orm.Aop.TraceBeforeHandler?.Invoke(this, before);
-            Exception exception = null;
-            try
-            {
-                if (_transaction != null || _batchAutoTransaction == false)
-                {
-                    for (var a = 0; a < ss.Length; a++)
-                    {
-                        _source = ss[a];
-                        _batchProgress?.Invoke(new BatchProgressStatus<T1>(_source, a + 1, ss.Length));
-                        ret.AddRange(this.RawExecuteUpdated());
-                    }
-                }
-                else
-                {
-                    if (_orm.Ado.MasterPool == null) throw new Exception(CoreStrings.MasterPool_IsNull_UseTransaction);
-                    using (var conn = _orm.Ado.MasterPool.Get())
-                    {
-                        _transaction = conn.Value.BeginTransaction();
-                        var transBefore = new Aop.TraceBeforeEventArgs("BeginTransaction", null);
-                        _orm.Aop.TraceBeforeHandler?.Invoke(this, transBefore);
-                        try
-                        {
-                            for (var a = 0; a < ss.Length; a++)
-                            {
-                                _source = ss[a];
-                                _batchProgress?.Invoke(new BatchProgressStatus<T1>(_source, a + 1, ss.Length));
-                                ret.AddRange(this.RawExecuteUpdated());
-                            }
-                            _transaction.Commit();
-                            _orm.Aop.TraceAfterHandler?.Invoke(this, new Aop.TraceAfterEventArgs(transBefore, CoreStrings.Commit, null));
-                        }
-                        catch (Exception ex)
-                        {
-                            _transaction.Rollback();
-                            _orm.Aop.TraceAfterHandler?.Invoke(this, new Aop.TraceAfterEventArgs(transBefore, CoreStrings.RollBack, ex));
-                            throw;
-                        }
-                        _transaction = null;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                exception = ex;
-                throw;
-            }
-            finally
-            {
-                var after = new Aop.TraceAfterEventArgs(before, null, exception);
-                _orm.Aop.TraceAfterHandler?.Invoke(this, after);
-            }
-            ClearData();
-            return ret;
-        }
-        #endregion
-
-        protected int RawExecuteAffrows()
+		protected int RawExecuteAffrows()
         {
             var affrows = 0;
             DbParameter[] dbParms = null;
@@ -531,12 +472,20 @@ namespace FreeSql.Internal.CommonProvider
             return affrows;
         }
 
-        protected abstract List<T1> RawExecuteUpdated();
+        protected abstract List<TReturn> RawExecuteUpdated<TReturn>(IEnumerable<ColumnInfo> columns);
 
-        public abstract int ExecuteAffrows();
-        public abstract List<T1> ExecuteUpdated();
+		public abstract int ExecuteAffrows();
+		protected abstract List<TReturn> ExecuteUpdated<TReturn>(IEnumerable<ColumnInfo> columns);
 
-        public IUpdate<T1> IgnoreColumns(Expression<Func<T1, object>> columns) => IgnoreColumns(_commonExpression.ExpressionSelectColumns_MemberAccess_New_NewArrayInit(null, null, columns?.Body, false, null));
+        public List<T1> ExecuteUpdated() => ExecuteUpdated<T1>(_table.ColumnsByPosition);
+        public List<TReturn> ExecuteUpdated<TReturn>(Expression<Func<T1, TReturn>> returnColumns)
+		{
+            var cols = _commonExpression.ExpressionSelectColumns_MemberAccess_New_NewArrayInit(null, null, returnColumns?.Body, false, null)
+                .Distinct().Select(a => _table.ColumnsByCs.TryGetValue(a, out var c) ? c : null).Where(a => a != null).ToArray();
+			return ExecuteUpdated<TReturn>(cols);
+		}
+
+		public IUpdate<T1> IgnoreColumns(Expression<Func<T1, object>> columns) => IgnoreColumns(_commonExpression.ExpressionSelectColumns_MemberAccess_New_NewArrayInit(null, null, columns?.Body, false, null));
         public IUpdate<T1> UpdateColumns(Expression<Func<T1, object>> columns) => UpdateColumns(_commonExpression.ExpressionSelectColumns_MemberAccess_New_NewArrayInit(null, null, columns?.Body, false, null));
 
         public IUpdate<T1> IgnoreColumns(string[] columns)
@@ -684,9 +633,9 @@ namespace FreeSql.Internal.CommonProvider
             _versionColumn = _ignoreVersion ? null : _table?.VersionColumn;
             return this;
         }
-        public IUpdate<T1> SetSourceIgnore(T1 source, Func<object, bool> ignore)
+        public IUpdate<T1> SetSourceIgnore(T1 source, Func<object, bool> ignore = null)
         {
-            if (ignore == null) throw new ArgumentNullException(nameof(ignore));
+            if (ignore == null) ignore = val => val == null;
             var columns = _table.Columns.Values
                 .Where(col => ignore(_orm.GetEntityValueWithPropertyName(_table.Type, source, col.CsName)))
                 .Select(col => col.Attribute.Name).ToArray();
@@ -805,14 +754,17 @@ namespace FreeSql.Internal.CommonProvider
             return this;
         }
 
-        public IUpdate<T1> SetDto(object dto)
-        {
+        public IUpdate<T1> SetDto(object dto) => SetDtoIgnore(dto, val => false);
+        public IUpdate<T1> SetDtoIgnore(object dto, Func<object, bool> ignore = null)
+		{
             if (dto == null) return this;
+            if (ignore == null) ignore = val => val == null;
             if (dto is Dictionary<string, object>)
             {
                 var dic = dto as Dictionary<string, object>;
                 foreach (var kv in dic)
                 {
+                    if (ignore(kv.Value)) continue;
                     if (_table.ColumnsByCs.TryGetValue(kv.Key, out var trycol) == false) continue;
                     if (_ignore.ContainsKey(trycol.Attribute.Name)) continue;
                     SetPriv(trycol, kv.Value);
@@ -822,9 +774,11 @@ namespace FreeSql.Internal.CommonProvider
             var dtoProps = dto.GetType().GetProperties();
             foreach (var dtoProp in dtoProps)
             {
-                if (_table.ColumnsByCs.TryGetValue(dtoProp.Name, out var trycol) == false) continue;
+                var val = dtoProp.GetValue(dto, null);
+				if (ignore(val)) continue;
+				if (_table.ColumnsByCs.TryGetValue(dtoProp.Name, out var trycol) == false) continue;
                 if (_ignore.ContainsKey(trycol.Attribute.Name)) continue;
-                SetPriv(trycol, dtoProp.GetValue(dto, null));
+                SetPriv(trycol, val);
             }
             return this;
         }
@@ -847,8 +801,17 @@ namespace FreeSql.Internal.CommonProvider
         public IUpdate<T1> WhereDynamic(object dywhere, bool not = false) => not == false ?
             this.Where(_commonUtils.WhereObject(_table, "", dywhere)) :
             this.Where($"not({_commonUtils.WhereObject(_table, "", dywhere)})");
+		public IUpdate<T1> WhereDynamicFilter(DynamicFilterInfo filter)
+		{
+			var alias = "t_" + Guid.NewGuid().ToString("n").Substring(0, 8);
+			var tempQuery = _orm.Select<object>().AsType(_table.Type).DisableGlobalFilter().As(alias);
+			tempQuery.WhereDynamicFilter(filter);
+			var where = (tempQuery as Select0Provider)._where.ToString().Replace(alias + ".", "");
+			_where.Append(where);
+			return this;
+		}
 
-        public IUpdate<T1> DisableGlobalFilter(params string[] name)
+		public IUpdate<T1> DisableGlobalFilter(params string[] name)
         {
             if (_whereGlobalFilter.Any() == false) return this;
             if (name?.Any() != true)
@@ -900,6 +863,7 @@ namespace FreeSql.Internal.CommonProvider
                     new[] { typeof(string), typeof(DateTime), typeof(DateTime?) }.Contains(col.Attribute.MapType) ||
                     col.Attribute.MapType.NullableTypeOrThis().IsEnum;
                 var ds = _source.Select(a => col.GetDbValue(a)).ToArray();
+                if (valsameIf == false && ds[0] == null) valsameIf = true;
                 if (valsameIf && ds.All(a => object.Equals(a, ds[0])))
                 {
                     var val = ds.First();
@@ -1002,18 +966,19 @@ namespace FreeSql.Internal.CommonProvider
             {
                 var sb1 = new StringBuilder();
                 ToSqlExtension110(sb1, false);
-                fetch(sb1);
+                if (sb1.Length > 0) fetch(sb1);
                 return;
             }
             if (_where.Length == 0) return;
-            var newwhere = new StringBuilder();
+			if (_set.Length == 0 && _setIncr.Length == 0) return;
+			var newwhere = new StringBuilder();
             ToSqlWhere(newwhere);
 
             var sb = new StringBuilder();
             if (_table.AsTableImpl != null && string.IsNullOrWhiteSpace(_tableRule?.Invoke(_table.DbName)) == true)
             {
                 var oldTableRule = _tableRule;
-                var names = _table.AsTableImpl.GetTableNamesBySqlWhere(newwhere.ToString(), _params, new SelectTableInfo { Table = _table }, _commonUtils);
+                var names = _table.AsTableImpl.GetTableNamesBySqlWhere(newwhere.ToString(), _params, new SelectTableInfo { Table = _table }, _commonUtils).Names;
                 foreach (var name in names)
                 {
                     _tableRule = old => name;
@@ -1035,11 +1000,12 @@ namespace FreeSql.Internal.CommonProvider
             {
                 var sb1 = new StringBuilder();
                 ToSqlExtension110(sb1, false);
-                await fetchAsync(sb1);
+				if (sb1.Length > 0) await fetchAsync(sb1);
                 sb1.Clear();
                 return;
             }
             if (_where.Length == 0) return;
+			if (_set.Length == 0 && _setIncr.Length == 0) return;
             var newwhere = new StringBuilder();
             ToSqlWhere(newwhere);
 
@@ -1047,7 +1013,7 @@ namespace FreeSql.Internal.CommonProvider
             if (_table.AsTableImpl != null && string.IsNullOrWhiteSpace(_tableRule?.Invoke(_table.DbName)) == true)
             {
                 var oldTableRule = _tableRule;
-                var names = _table.AsTableImpl.GetTableNamesBySqlWhere(newwhere.ToString(), _params, new SelectTableInfo { Table = _table }, _commonUtils);
+                var names = _table.AsTableImpl.GetTableNamesBySqlWhere(newwhere.ToString(), _params, new SelectTableInfo { Table = _table }, _commonUtils).Names;
                 foreach (var name in names)
                 {
                     _tableRule = old => name;
@@ -1063,7 +1029,7 @@ namespace FreeSql.Internal.CommonProvider
             sb.Clear();
         }
 #endif
-        public virtual void ToSqlExtension110(StringBuilder sb, bool isAsTableSplited)
+		public virtual void ToSqlExtension110(StringBuilder sb, bool isAsTableSplited)
         {
             if (_where.Length == 0 && _source.Any() == false) return;
             if (_source.Any() == false && _set.Length == 0 && _setIncr.Length == 0) return;
@@ -1126,7 +1092,11 @@ namespace FreeSql.Internal.CommonProvider
                         ++colidx;
                     }
                 }
-                if (colidx == 0) return;
+                if (colidx == 0)
+                {
+                    sb.Clear();
+                    return;
+                }
 
             }
             else if (_source.Count > 1)
@@ -1157,7 +1127,8 @@ namespace FreeSql.Internal.CommonProvider
                                 new[] { typeof(string), typeof(DateTime), typeof(DateTime?) }.Contains(col.Attribute.MapType) ||
                                 col.Attribute.MapType.NullableTypeOrThis().IsEnum;
                             var ds = _source.Select(a => col.GetDbValue(a)).ToArray();
-                            if (valsameIf && ds.All(a => object.Equals(a, ds[0])))
+							if (valsameIf == false && ds[0] == null) valsameIf = true;
+							if (valsameIf && ds.All(a => object.Equals(a, ds[0])))
                             {
                                 var val = ds.First();
                                 var colsql = _noneParameter ? _commonUtils.GetNoneParamaterSqlValue(_paramsSource, "u", col, col.Attribute.MapType, val) :

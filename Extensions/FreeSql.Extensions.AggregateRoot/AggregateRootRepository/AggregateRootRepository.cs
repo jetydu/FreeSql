@@ -57,20 +57,32 @@ namespace FreeSql
             }
         }
         public void AsType(Type entityType) => _repository.AsType(entityType); 
-        Func<string, string> _asTableRule;
+        Func<Type, string, string> _asTableRule;
         public void AsTable(Func<string, string> rule)
         {
             _repository.AsTable(rule);
-            _asTableRule = rule;
+            if (rule == null)
+            {
+                _asTableRule = null;
+                return;
+            }
+            _asTableRule = (t, old) => t == EntityType ? rule(old) : null;
         }
-        public Type EntityType => _repository.EntityType;
+		public void AsTable(Func<Type, string, string> rule)
+		{
+			_repository.AsTable(rule);
+			_asTableRule = rule;
+		}
+		public Type EntityType => _repository.EntityType;
         public IDataFilter<TEntity> DataFilter => _repository.DataFilter;
 
         public void Attach(TEntity entity)
         {
             var state = CreateEntityState(entity);
-            if (_states.ContainsKey(state.Key)) _states[state.Key] = state;
-            else _states.Add(state.Key, state);
+            if (_states.ContainsKey(state.Key)) 
+                _states[state.Key] = state;
+            else
+                _states.Add(state.Key, state);
         }
         public void Attach(IEnumerable<TEntity> entity)
         {
@@ -107,11 +119,12 @@ namespace FreeSql
         public ISelect<TEntity> WhereIf(bool condition, Expression<Func<TEntity, bool>> exp) => Select.WhereIf(condition, exp);
 
         readonly Dictionary<Type, IBaseRepository<object>> _childRepositorys = new Dictionary<Type, IBaseRepository<object>>();
+        protected virtual IFreeSql GetChildFreeSql(Type type) => Orm;
         IBaseRepository<object> GetChildRepository(Type type)
         {
             if (_childRepositorys.TryGetValue(type, out var repo) == false)
             {
-                repo = Orm.GetRepository<object>();
+                repo = GetChildFreeSql(type).GetRepository<object>();
                 repo.AsType(type);
                 _childRepositorys.Add(type, repo);
             }

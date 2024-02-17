@@ -116,9 +116,17 @@ namespace base_entity
             public string msg { get; set; }
             public DateTime createtime { get; set; }
             public int click { get; set; }
-        }
+		}
+		[Table(Name = "as_table_logext_{yyyyMMddHH}", AsTable = "createtime=2022-1-1 11(12,2 month)")]
+		class AsTableLogExt
+		{
+			public Guid id { get; set; }
+			public string msg { get; set; }
+			public DateTime createtime { get; set; }
+			public int click { get; set; }
+		}
 
-        public class SomeEntity
+		public class SomeEntity
         {
             [Column(IsIdentity = true)]
             public int Id { get; set; }
@@ -305,6 +313,7 @@ namespace base_entity
             public int id { get; set; }
             public int parentid { get; set; }
             public string code { get; set; }
+            public ActivityStatusCode status { get; set; }  
 
             [Navigate(nameof(parentid))]
             public TreeModel Parent { get; set; }
@@ -544,12 +553,11 @@ namespace base_entity
 
             #region 初始化 IFreeSql
             var fsql = new FreeSql.FreeSqlBuilder()
-                .UseAutoSyncStructure(false)
+                .UseAutoSyncStructure(true)
                 .UseNoneCommandParameter(true)
-                .UseNameConvert(NameConvertType.ToLower)
+                //.UseNameConvert(NameConvertType.ToLower)
                 //.UseMappingPriority(MappingPriorityType.Attribute, MappingPriorityType.FluentApi, MappingPriorityType.Aop)
                 .UseAdoConnectionPool(true)
-                .UseConnectionFactory(DataType.Xugu, () => null)
 
                 //.UseConnectionString(FreeSql.DataType.Sqlite, "data source=123.db")
                 //.UseConnectionString(DataType.Sqlite, "data source=db1.db;attachs=db2.db")
@@ -560,35 +568,36 @@ namespace base_entity
                 //.UseConnectionString(FreeSql.DataType.Firebird, @"database=localhost:D:\fbdata\EXAMPLES.fdb;user=sysdba;password=123456;max pool size=5")
                 //.UseQuoteSqlName(false)
 
-                //.UseConnectionString(FreeSql.DataType.MySql, "Data Source=127.0.0.1;Port=3306;User ID=root;Password=root;Initial Catalog=cccddd;Charset=utf8;SslMode=none;min pool size=1;Max pool size=3;AllowLoadLocalInfile=true")
+                .UseConnectionString(FreeSql.DataType.MySql, "Data Source=127.0.0.1;Port=3306;User ID=root;Password=root;Initial Catalog=cccddd;Charset=utf8;SslMode=none;min pool size=1;Max pool size=3;AllowLoadLocalInfile=true")
 
-                //.UseConnectionString(FreeSql.DataType.SqlServer, "Data Source=.;Integrated Security=True;Initial Catalog=freesqlTest;Pooling=true;Max Pool Size=3;TrustServerCertificate=true")
-                //.UseAdoConnectionPool(false)
-                //.UseConnectionString(FreeSql.DataType.PostgreSQL, "Host=192.168.164.10;Port=5432;Username=postgres;Password=123456;Database=tedb;Pooling=true;Maximum Pool Size=2")
-                ////.UseConnectionString(FreeSql.DataType.PostgreSQL, "Host=192.168.164.10;Port=5432;Username=postgres;Password=123456;Database=toc;Pooling=true;Maximum Pool Size=2")
-                //.UseNameConvert(FreeSql.Internal.NameConvertType.ToLower)
+				//.UseConnectionString(FreeSql.DataType.SqlServer, "Data Source=.;Integrated Security=True;Initial Catalog=freesqlTest;Pooling=true;Max Pool Size=3;TrustServerCertificate=true")
+				//.UseAdoConnectionPool(false)
+				//.UseConnectionString(FreeSql.DataType.PostgreSQL, "Host=127.0.0.1;Port=5432;Username=postgres;Password=123456;Database=tedb;Pooling=true;Maximum Pool Size=2")
+				////.UseConnectionString(FreeSql.DataType.PostgreSQL, "Host=127.0.0.1;Port=5432;Username=postgres;Password=123456;Database=toc;Pooling=true;Maximum Pool Size=2")
+				//.UseNameConvert(FreeSql.Internal.NameConvertType.ToLower)
 
-                //.UseConnectionString(FreeSql.DataType.Oracle, "user id=user1;password=123456;data source=//127.0.0.1:1521/XE;Pooling=true;Max Pool Size=2")
-                //.UseNameConvert(FreeSql.Internal.NameConvertType.ToUpper)
+				//.UseConnectionString(FreeSql.DataType.Oracle, "user id=user1;password=123456;data source=//127.0.0.1:1521/XE;Pooling=true;Max Pool Size=2")
+				//.UseNameConvert(FreeSql.Internal.NameConvertType.ToUpper)
 
-                //.UseConnectionString(FreeSql.DataType.Dameng, "server=127.0.0.1;port=5236;user=2user;password=123456789;database=2user;poolsize=5;")
-                //.UseNameConvert(FreeSql.Internal.NameConvertType.ToUpper)
+				//.UseConnectionString(FreeSql.DataType.Dameng, "server=127.0.0.1;port=5236;user=2user;password=123456789;database=2user;poolsize=5;")
+				//.UseNameConvert(FreeSql.Internal.NameConvertType.ToUpper)
 
-                //.UseConnectionString(FreeSql.DataType.OdbcMySql, "Driver={MySQL ODBC 8.0 Unicode Driver};Server=127.0.0.1;Persist Security Info=False;Trusted_Connection=Yes;UID=root;PWD=root;DATABASE=cccddd_odbc;Charset=utf8;SslMode=none;Max pool size=2")
+				//.UseConnectionString(FreeSql.DataType.OdbcMySql, "Driver={MySQL ODBC 8.0 Unicode Driver};Server=127.0.0.1;Persist Security Info=False;Trusted_Connection=Yes;UID=root;PWD=root;DATABASE=cccddd_odbc;Charset=utf8;SslMode=none;Max pool size=2")
 
-                //.UseConnectionString(FreeSql.DataType.OdbcSqlServer, "Driver={SQL Server};Server=.;Persist Security Info=False;Trusted_Connection=Yes;Integrated Security=True;DATABASE=freesqlTest_odbc;Pooling=true;Max pool size=3")
+				//.UseConnectionString(FreeSql.DataType.OdbcSqlServer, "Driver={SQL Server};Server=.;Persist Security Info=False;Trusted_Connection=Yes;Integrated Security=True;DATABASE=freesqlTest_odbc;Pooling=true;Max pool size=3")
 
-                //.UseConnectionString(FreeSql.DataType.OdbcPostgreSQL, "Driver={PostgreSQL Unicode(x64)};Server=192.168.164.10;Port=5432;UID=postgres;PWD=123456;Database=tedb_odbc;Pooling=true;Maximum Pool Size=2")
-                //.UseNameConvert(FreeSql.Internal.NameConvertType.ToLower)
+				//.UseConnectionString(FreeSql.DataType.OdbcPostgreSQL, "Driver={PostgreSQL Unicode(x64)};Server=127.0.0.1;Port=5432;UID=postgres;PWD=123456;Database=tedb_odbc;Pooling=true;Maximum Pool Size=2")
+				//.UseNameConvert(FreeSql.Internal.NameConvertType.ToLower)
 
-                //.UseConnectionString(FreeSql.DataType.OdbcOracle, "Driver={Oracle in XE};Server=//127.0.0.1:1521/XE;Persist Security Info=False;Trusted_Connection=Yes;UID=odbc1;PWD=123456")
-                //.UseNameConvert(FreeSql.Internal.NameConvertType.ToUpper)
+				//.UseConnectionString(FreeSql.DataType.OdbcOracle, "Driver={Oracle in XE};Server=//127.0.0.1:1521/XE;Persist Security Info=False;Trusted_Connection=Yes;UID=odbc1;PWD=123456")
+				//.UseNameConvert(FreeSql.Internal.NameConvertType.ToUpper)
 
-                //.UseConnectionString(FreeSql.DataType.OdbcDameng, "Driver={DM8 ODBC DRIVER};Server=127.0.0.1:5236;Persist Security Info=False;Trusted_Connection=Yes;UID=USER1;PWD=123456789")
-                //.UseConnectionString(DataType.QuestDb, "host=localhost;port=8812;username=admin;password=quest;database=qdb;ServerCompatibilityMode=NoTypeLoading;")
+				//.UseConnectionString(FreeSql.DataType.OdbcDameng, "Driver={DM8 ODBC DRIVER};Server=127.0.0.1:5236;Persist Security Info=False;Trusted_Connection=Yes;UID=USER1;PWD=123456789")
+				//.UseConnectionString(DataType.QuestDb, "host=localhost;port=8812;username=admin;password=quest;database=qdb;ServerCompatibilityMode=NoTypeLoading;")
 
-                //.UseConnectionString(DataType.ClickHouse, "DataCompress=False;BufferSize=32768;SocketTimeout=10000;CheckCompressedHash=False;Encrypt=False;Compressor=lz4;Host=192.168.0.121;Port=8125;Database=PersonnelLocation;Username=root;Password=123")
-                .UseMonitorCommand(cmd =>
+				//.UseConnectionString(DataType.ClickHouse, "DataCompress=False;BufferSize=32768;SocketTimeout=10000;CheckCompressedHash=False;Encrypt=False;Compressor=lz4;Host=192.168.0.121;Port=8125;Database=PersonnelLocation;Username=root;Password=123")
+                //.UseConnectionFactory(DataType.ClickHouse, () => null)
+				.UseMonitorCommand(cmd =>
                 {
                     Console.WriteLine(cmd.CommandText + "\r\n");
                     //cmd.CommandText = null; //不执行
@@ -599,15 +608,136 @@ namespace base_entity
                 .UseGenerateCommandParameterWithLambda(true)
                 .Build();
             BaseEntity.Initialization(fsql, () => _asyncUow.Value);
-			#endregion
+            #endregion
+
+            fsql.Delete<BaseDistrict>().Where("1=1").ExecuteAffrows();
+            var repoxx = fsql.GetRepository<VM_District_Child>();
+            repoxx.DbContextOptions.EnableCascadeSave = true;
+            repoxx.DbContextOptions.NoneParameter = true;
+            repoxx.Insert(new VM_District_Child
+            {
+                Code = "100000",
+                Name = "中国",
+                Childs = new List<VM_District_Child>(new[] {
+                    new VM_District_Child
+                    {
+                        Code = "110000",
+                        Name = "北京",
+                        Childs = new List<VM_District_Child>(new[] {
+                            new VM_District_Child{ Code="110100", Name = "北京市" },
+                            new VM_District_Child{ Code="110101", Name = "东城区" },
+                        })
+                    }
+                })
+            });
+            var ttre1 = fsql.Select<VM_District_Child>().Where(a => a.Name == "中国")
+                .AsTreeCte(pathSelector: a => $"[{a.Name}]{a.Code}", pathSeparator: "=>")
+                .OrderBy(a => a.Code).ToTreeList(); ;
+
+            var list111222 = fsql.Select<OrderLine, Product>()
+			    .InnerJoin((l, p) => l.ProductId == p.ID)
+			    .GroupBy((l, p) => new { p.ID, ShopType = l.ShopType ?? 0 })
+			    .WithTempQuery(a => new
+			    {
+				    a.Key.ID,
+				    Money = a.Sum(a.Value.Item1.Amount) * a.Key.ShopType
+			    })
+			    .ToList();
+			Console.WriteLine(list111222);
+
+			var list0x1sql = fsql.Select<OrderLine22x, Product22x>()
+                .InnerJoin((l, p) => l.ProductId == p.ID)
+                .GroupBy((l, p) => new { p.ID, l.ShopType })
+                .WithTempQuery(a => new {
+	                a.Key.ID,
+	                Money2 = a.Key.ShopType,
+	                Money = a.Key.ShopType == 1 ? a.Value.Item1.Price * a.Value.Item1.Amount : a.Value.Item1.Price * a.Value.Item1.Amount * 1.1m
+                })
+                .ToSql();
+			Console.WriteLine(list0x1sql);
+			var sql1c2 = fsql.Select<User1>()
+				.GroupBy(a => new { a.Nickname, a.Avatar })
+				.WithTempQuery(b => new
+				{
+					sum = b.Sum(b.Value.Sort),
+					b.Key.Nickname,
+					b.Key.Avatar,
+				})
+				.OrderByDescending(arg => arg.sum)
+				.ToSql(arg => new
+				{
+					str1 = string.Concat(arg.Nickname, '-', arg.Avatar, '-'),
+					str2 = string.Concat(arg.Nickname, '-', arg.Avatar)
+				});   //报错 多括号
+					  //.ToOne(arg => string.Concat(arg.Nickname, '-', arg.Avatar)); //正常
+			Console.WriteLine(sql1c2);
+
+			//var clickhouseSql1 = fsql.Select<User1>().Where(a => new[] { 1, 2, 3 }.Contains(a.GroupId)).ToSql();
+			//         var clickhouseVal1 = new[] { 1, 2, 3 };
+			//         var clickhouseSql2 = fsql.Select<User1>().Where(a => clickhouseVal1.Contains(a.GroupId)).ToSql();
+			//         var clickhouseSql3 = fsql.Select<User1>().Where(a => a.Tags.Contains("tag1")).ToSql();
+			//         var clickhouseVal2 = "tag2";
+			//         var clickhouseSql4 = fsql.Select<User1>().Where(a => a.Tags.Contains(clickhouseVal2)).ToSql();
+
+			fsql.Update<User1>()
+		        .Where(t => t.GroupId == 1)
+		        .ExecuteUpdated();
+
+
+			fsql.Update<User1>()
+		        .Where(t => t.GroupId == 1)
+				.SetIf(false, t => t.CreateTime == DateTime.Now)
+				.ExecuteUpdated();
+
+			//fsql.CodeFirst.IsGenerateCommandParameterWithLambda = true;
+			//var TreeModel01 = fsql.Select<TreeModel>().Where(a => a.code == "x" && a.Childs.AsSelect().Any(b => b.id == a.id && b.status == ActivityStatusCode.Error)).ToList();
+
+			var v1 = 123123123;
+            var mysql0111 = fsql.Select<User1>().Where(a => a.Nickname.Contains(v1.ToString())).ToSql();
+            var mysql0112 = fsql.Select<User1>().Where(a => a.Nickname.Contains(123123123.ToString())).ToSql();
+			var v2 = "123123123";
+			var mysql0113 = fsql.Select<User1>().Where(a => a.Nickname.Contains(v2)).ToSql();
+			var mysql0114 = fsql.Select<User1>().Where(a => a.Nickname.Contains(v2.ToString())).ToSql();
+			var mysql0115 = fsql.Select<User1>().Where(a => a.Nickname.Contains("123123123")).ToSql();
 
 			//fsql.Select<AsTableLog>().Where(a => a.createtime > DateTime.Now && a.createtime < DateTime.Now.AddMonths(1)).ToList();
-            //var table = fsql.CodeFirst.GetTableByEntity(typeof(AsTableLog));
-            //table.SetAsTable(new ModAsTableImpl(fsql), table.ColumnsByCs[nameof(AsTableLog.click)]);
+			//var table = fsql.CodeFirst.GetTableByEntity(typeof(AsTableLog));
+			//table.SetAsTable(new ModAsTableImpl(fsql), table.ColumnsByCs[nameof(AsTableLog.click)]);
 
-            fsql.CodeFirst.GetTableByEntity(typeof(AsTableLog)).AsTableImpl
+			fsql.CodeFirst.GetTableByEntity(typeof(AsTableLog)).AsTableImpl
                 .SetTableName(0, "AsTableLog1")
-                .SetTableName(1, "AsTableLog2");
+                .SetTableName(1, "AsTableLog2")
+                .SetDefaultAllTables(value =>
+                {
+                    if (value.Length > 3) return value.Take(3).ToArray();
+                    return value;
+                })
+                ;
+
+
+			var astsql01 = fsql.Select<AsTableLog, Sys_owner>()
+				.InnerJoin((a, b) => a.id == b.Id)
+				.OrderBy((a, b) => a.createtime)
+				.ToSql();
+
+			var astsql02 = fsql.Select<Sys_owner, AsTableLog>()
+				.InnerJoin((a, b) => a.Id == b.id)
+				.OrderBy((a, b) => b.createtime)
+				.ToSql();
+
+			var astsql03 = fsql.Select<AsTableLog>()
+	            .Where(a => a.createtime.Between(DateTime.Parse("2022-3-1"), DateTime.Parse("2023-5-1")))
+                .WithTempQuery(a => a)
+				.FromQuery(fsql.Select<AsTableLogExt>().Where(a => a.createtime.Between(DateTime.Parse("2022-3-1"), DateTime.Parse("2023-5-1"))))
+	            .InnerJoin((a, b) => a.id == b.id)
+	            .OrderBy((a, b) => a.createtime)
+				.ToSql();
+
+			var astsql04 = fsql.Select<AsTableLog, AsTableLogExt>()
+				.InnerJoin((a, b) => a.id == b.id)
+                .Where((a,b) => a.createtime < DateTime.Parse("2023-5-1"))
+				.OrderBy((a, b) => a.createtime)
+				.ToSql();
 
 			var testitems = new[]
 			{
@@ -763,16 +893,6 @@ namespace base_entity
             fsql.UseJsonMap();
             fsql.Select<MiDevice>().Where(a => a.FormLocking == null).Count();
 
-            var list0x1sql = fsql.Select<OrderLine22x, Product22x>()
-.InnerJoin((l, p) => l.ProductId == p.ID)
-.GroupBy((l, p) => new { p.ID, l.ShopType })
-.WithTempQuery(a => new {
-    a.Key.ID,
-    Money2 = a.Key.ShopType,
-    Money = a.Key.ShopType == 1 ? a.Value.Item1.Price * a.Value.Item1.Amount : a.Value.Item1.Price * a.Value.Item1.Amount * 1.1m
-})
-.ToSql();
-            Console.WriteLine(list0x1sql);
 
             fsql.Delete<TypeHandler01>().Where("1=1").ExecuteAffrows();
             FreeSql.Internal.Utils.TypeHandlers.TryAdd(typeof(TestIdAndIdentity), new String_TestIdAndIdentity());
@@ -993,10 +1113,6 @@ namespace base_entity
             var sqlastable2 = fsql.Update<CurrentDetail>(101).AsTable("current_detail_230501").Set(t => t.StatuId, 1).ToSql();
             var sqlastable3 = fsql.Delete<CurrentDetail>(101).AsTable("current_detail_230501").ToSql();
 
-            var astsql = fsql.Select<AsTableLog, Sys_owner>()
-                .InnerJoin((a, b) => a.id == b.Id)
-                .OrderBy((a, b) => a.createtime)
-                .ToSql();
 
 
 			
@@ -1147,22 +1263,8 @@ var sql11111 = fsql.Select<Class1111>()
                 .Set((a, b) => a.Nickname == "b.groupname")
                 .ExecuteAffrows();
 
-            var sql1c2 = fsql.Select<User1>()
-                .GroupBy(a => new { a.Nickname, a.Avatar })
-                .WithTempQuery(b => new
-                {
-                    sum = b.Sum(b.Value.Sort),
-                    b.Key.Nickname,
-                    b.Key.Avatar,
-                })
-                .OrderByDescending(arg => arg.sum)
-                .ToSql(arg => new
-                {
-                    str1 = string.Concat(arg.Nickname, '-', arg.Avatar, '-'),
-                    str2 = string.Concat(arg.Nickname, '-', arg.Avatar)
-                });   //报错 多括号
-                //.ToOne(arg => string.Concat(arg.Nickname, '-', arg.Avatar)); //正常
-            Console.WriteLine(sql1c2);
+
+			
 
             var xp = new Xpb()
             {
@@ -3001,4 +3103,56 @@ public class Test2
     public string ItemName { get; set; }
 
     public bool IsEnabled { get; set; }
+}
+[JsonObject(MemberSerialization.OptIn), Table(Name = "T_OrderLine111222")]
+public partial class OrderLine
+{
+
+	public string Id { get; set; }
+	public string OrderId { get; set; }
+
+	public string ShopId { get; set; }
+	[JsonProperty, Column(Name = "Shop_Type")]
+	public int? ShopType { get; set; }
+	public string ProductId { get; set; }
+	public decimal Price { get; set; }
+	public decimal? Amount { get; set; }
+}
+[JsonObject(MemberSerialization.OptIn), Table(Name = "T_Product111222")]
+public partial class Product
+{
+	public string ID { get; set; }
+	public string Name { get; set; }
+	public string Model { get; set; }
+}
+
+[Table(Name = "D1_District")]
+public class BaseDistrict
+{
+    [Column(IsPrimary = true, StringLength = 6)]
+    public string Code { get; set; }
+
+    [Column(StringLength = 20, IsNullable = false)]
+    public string Name { get; set; }
+
+    [Column(StringLength = 6)]
+    public virtual string ParentCode { get; set; }
+
+    public int testint { get; set; }
+}
+[Table(Name = "D1_District")]
+public class VM_District_Child : BaseDistrict
+{
+    public override string ParentCode { get => base.ParentCode; set => base.ParentCode = value; }
+
+    [Navigate(nameof(ParentCode))]
+    public List<VM_District_Child> Childs { get; set; }
+}
+[Table(Name = "D1_District")]
+public class VM_District_Parent : BaseDistrict
+{
+    public override string ParentCode { get => base.ParentCode; set => base.ParentCode = value; }
+
+    [Navigate(nameof(ParentCode))]
+    public VM_District_Parent Parent { get; set; }
 }

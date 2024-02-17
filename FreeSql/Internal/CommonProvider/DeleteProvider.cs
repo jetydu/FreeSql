@@ -120,8 +120,21 @@ namespace FreeSql.Internal.CommonProvider
         public IDelete<T1> WhereDynamic(object dywhere, bool not = false) => not == false ?
             this.Where(_commonUtils.WhereObject(_table, "", dywhere)) :
             this.Where($"not({_commonUtils.WhereObject(_table, "", dywhere)})");
+		public IDelete<T1> WhereDynamicFilter(DynamicFilterInfo filter)
+        {
+            var alias = "t_" + Guid.NewGuid().ToString("n").Substring(0, 8);
+			var tempQuery = _orm.Select<object>().AsType(_table.Type).DisableGlobalFilter().As(alias);
+            tempQuery.WhereDynamicFilter(filter);
+            var where = (tempQuery as Select0Provider)._where.ToString().Replace(alias + ".", "");
+            if (where.StartsWith(" AND "))
+            {
+				if (++_whereTimes == 1) _where.Append(where.Substring(5));
+                else _where.Append(where);
+            }
+			return this;
+        }
 
-        public IDelete<T1> DisableGlobalFilter(params string[] name)
+		public IDelete<T1> DisableGlobalFilter(params string[] name)
         {
             if (_whereGlobalFilter.Any() == false) return this;
             if (name?.Any() != true)
@@ -199,13 +212,13 @@ namespace FreeSql.Internal.CommonProvider
             if (_table.AsTableImpl != null && string.IsNullOrWhiteSpace(_tableRule?.Invoke(_table.DbName)) == true)
             {
                 var oldTableRule = _tableRule;
-                var names = _table.AsTableImpl.GetTableNamesBySqlWhere(newwhere.ToString(), _params, new SelectTableInfo { Table = _table }, _commonUtils);
+                var names = _table.AsTableImpl.GetTableNamesBySqlWhere(newwhere.ToString(), _params, new SelectTableInfo { Table = _table }, _commonUtils).Names;
                 foreach (var name in names)
                 {
                     _tableRule = old => name;
                     sb.Clear().Append("DELETE FROM ").Append(_commonUtils.QuoteSqlName(TableRuleInvoke())).Append(newwhere);
                     _interceptSql?.Invoke(sb);
-                    fetch(sb);
+					if (sb.Length > 0) fetch(sb);
                 }
                 _tableRule = oldTableRule;
                 return;
@@ -234,13 +247,13 @@ namespace FreeSql.Internal.CommonProvider
             if (_table.AsTableImpl != null && string.IsNullOrWhiteSpace(_tableRule?.Invoke(_table.DbName)) == true)
             {
                 var oldTableRule = _tableRule;
-                var names = _table.AsTableImpl.GetTableNamesBySqlWhere(newwhere.ToString(), _params, new SelectTableInfo { Table = _table }, _commonUtils);
+                var names = _table.AsTableImpl.GetTableNamesBySqlWhere(newwhere.ToString(), _params, new SelectTableInfo { Table = _table }, _commonUtils).Names;
                 foreach (var name in names)
                 {
                     _tableRule = old => name;
                     sb.Clear().Append("DELETE FROM ").Append(_commonUtils.QuoteSqlName(TableRuleInvoke())).Append(newwhere);
                     _interceptSql?.Invoke(sb);
-                    await fetchAsync(sb);
+					if (sb.Length > 0) await fetchAsync(sb);
                 }
                 _tableRule = oldTableRule;
                 return;

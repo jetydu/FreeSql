@@ -20,6 +20,7 @@ namespace FreeSql.Internal.CommonProvider
         public List<SelectTableInfo> _tables;
         public int _groupByLimit, _groupBySkip;
         public bool _addFieldAlias;
+        public bool _flagNestedFieldAlias;
 
         public SelectGroupingProvider(IFreeSql orm, Select0Provider select, ReadAnonymousTypeInfo map, string field, CommonExpression comonExp, List<SelectTableInfo> tables)
         {
@@ -53,6 +54,7 @@ namespace FreeSql.Internal.CommonProvider
                     }
                     ParseExpMapResult = read;
                     if (!_addFieldAlias) return read.DbField;
+                    if (_flagNestedFieldAlias) return read.DbField;
                     if (_comonExp.EndsWithDbNestedField(read.DbField, read.DbNestedField) == false)
                     {
                         _ParseExpOnlyDbField.Value = read.DbField;
@@ -229,7 +231,7 @@ namespace FreeSql.Internal.CommonProvider
     public class SelectGroupingProvider<TKey, TValue> : SelectGroupingProvider, ISelectGrouping<TKey, TValue>
     {
         public SelectGroupingProvider(IFreeSql orm, Select0Provider select, ReadAnonymousTypeInfo map, string field, CommonExpression comonExp, List<SelectTableInfo> tables)
-            :base(orm, select, map, field, comonExp, tables) { }
+            : base(orm, select, map, field, comonExp, tables) { }
 
         public string ToSql<TReturn>(Expression<Func<ISelectGroupingAggregate<TKey, TValue>, TReturn>> select, FieldAliasOptions fieldAlias = FieldAliasOptions.AsIndex)
         {
@@ -252,10 +254,11 @@ namespace FreeSql.Internal.CommonProvider
             if (ret._tables[0].Table == null) ret._tables[0].Table = TableInfo.GetDefaultTable(typeof(TDto));
             Select0Provider.WithTempQueryParser parser = null;
             _addFieldAlias = true; //解决：[Column(Name = "flevel") 与属性名不一致时，嵌套查询 bug
+            _flagNestedFieldAlias = true;//解决重复设置别名问题：.GroupBy((l, p) => new { p.ID, ShopType=l.ShopType??0 }).WithTempQuery(a => new { Money = a.Sum(a.Value.Item1.Amount)* a.Key.ShopType })
             var old_field = _field;
             var fieldsb = new StringBuilder();
             if (_map.Childs.Any() == false) fieldsb.Append(", ").Append(_map.DbField).Append(_comonExp.EndsWithDbNestedField(_map.DbField, _map.DbNestedField) ? "" : _comonExp._common.FieldAsAlias(_map.DbNestedField));
-            foreach (var child in _map.GetAllChilds()) 
+            foreach (var child in _map.GetAllChilds())
                 fieldsb.Append(", ").Append(child.DbField).Append(_comonExp.EndsWithDbNestedField(child.DbField, child.DbNestedField) ? "" : _comonExp._common.FieldAsAlias(child.DbNestedField));
             _field = fieldsb.ToString();
             fieldsb.Clear();
@@ -268,6 +271,7 @@ namespace FreeSql.Internal.CommonProvider
                 fieldsb.Clear();
                 _field = old_field;
                 _addFieldAlias = false;
+                _flagNestedFieldAlias = false;
             }
             var sql = $"\r\n{this.ToSql(parser._insideSelectList[0].InsideField)}";
             ret.WithSql(sql);

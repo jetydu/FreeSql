@@ -98,8 +98,10 @@ namespace FreeSql.ShenTong
                                     var enumStr = ExpressionLambdaToSql(callExp.Object, tsc);
                                     tsc.SetMapColumnTmp(null).SetMapTypeReturnOld(oldMapType);
                                     return enumStr;
-                                }
-                                return callExp.Arguments.Count == 0 ? $"({getExp(callExp.Object)})::text" : null;
+								}
+								var value = ExpressionGetValue(callExp.Object, out var success);
+								if (success) return formatSql(value, typeof(string), null, null);
+								return callExp.Arguments.Count == 0 ? $"({getExp(callExp.Object)})::text" : null;
                             }
                             return null;
                     }
@@ -145,14 +147,14 @@ namespace FreeSql.ShenTong
                                 tsc.isNotSetMapColumnTmp = false;
                                 tsc.SetMapColumnTmp(null).SetMapTypeReturnOld(oldMapType);
                                 if (oldDbParams != null) tsc.SetDbParamsReturnOld(oldDbParams);
-                                //判断 in 或 array @> array
-                                if (left.StartsWith("array[") || left.EndsWith("]"))
-                                    return $"({args1}) in ({left.Substring(6, left.Length - 7)})";
-                                if (left.StartsWith("(") || left.EndsWith(")")) //在各大 Provider AdoProvider 中已约定，500元素分割, 3空格\r\n4空格
-                                    return $"(({args1}) in {left.Replace(",   \r\n    \r\n", $") \r\n OR ({args1}) in (")})";
-                                if (args1.StartsWith("(") || args1.EndsWith(")")) args1 = $"array[{args1.TrimStart('(').TrimEnd(')')}]";
-                                args1 = $"array[{args1}]";
-                                if (objExp != null)
+								//判断 in 或 array @> array
+								if (left.StartsWith("array[") && left.EndsWith("]"))
+									return $"({args1}) in ({left.Substring(6, left.Length - 7)})";
+								if (left.StartsWith("(") && left.EndsWith(")")) //在各大 Provider AdoProvider 中已约定，500元素分割, 3空格\r\n4空格
+									return $"(({args1}) in {left.Replace(",   \r\n    \r\n", $") \r\n OR ({args1}) in (")})";
+								if (args1.StartsWith("(") && args1.EndsWith(")")) args1 = $"array[{args1.TrimStart('(').TrimEnd(')')}]";
+								else args1 = $"array[{args1}]";
+								if (objExp != null)
                                 {
                                     var dbinfo = _common._orm.CodeFirst.GetDbInfo(objExp.Type);
                                     if (dbinfo != null) args1 = $"{args1}::{dbinfo.dbtype}";

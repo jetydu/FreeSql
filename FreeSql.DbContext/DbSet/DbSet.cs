@@ -66,16 +66,27 @@ namespace FreeSql
             if (_db.Options.NoneParameter != null) insert.NoneParameter(_db.Options.NoneParameter.Value);
             return insert;
         }
-        protected virtual IInsert<TEntity> OrmInsert(TEntity data)
+        protected virtual IInsert<TEntity> OrmInsert(TEntity entity)
         {
             var insert = OrmInsert();
-            if (data != null) (insert as InsertProvider<TEntity>)._source.Add(data); //防止 Aop.AuditValue 触发两次
+            if (entity != null)
+            {
+                (insert as InsertProvider<TEntity>)._source.Add(entity); //防止 Aop.AuditValue 触发两次
+                if (_db.Options.AuditValue != null) 
+                    _db.Options.AuditValue(new DbContextAuditValueEventArgs(Aop.AuditValueType.Insert, _table.Type, entity));
+            }
             return insert;
         }
-        protected virtual IInsert<TEntity> OrmInsert(IEnumerable<TEntity> data)
+        protected virtual IInsert<TEntity> OrmInsert(IEnumerable<TEntity> entitys)
         {
             var insert = OrmInsert();
-            if (data != null) (insert as InsertProvider<TEntity>)._source.AddRange(data.Where(a => a != null)); //防止 Aop.AuditValue 触发两次
+            if (entitys != null)
+            {
+                (insert as InsertProvider<TEntity>)._source.AddRange(entitys.Where(a => a != null)); //防止 Aop.AuditValue 触发两次
+                if (_db.Options.AuditValue != null)
+                    foreach (var item in entitys)
+                        _db.Options.AuditValue(new DbContextAuditValueEventArgs(Aop.AuditValueType.Insert, _table.Type, item));
+            }
             return insert;
         }
 
@@ -84,7 +95,13 @@ namespace FreeSql
             var update = _db.OrmOriginal.Update<TEntity>().AsType(_entityType).WithTransaction(_uow?.GetOrBeginTransaction());
             if (_db.Options.NoneParameter != null) update.NoneParameter(_db.Options.NoneParameter.Value);
             if (_db.Options.EnableGlobalFilter == false) update.DisableGlobalFilter();
-            if (entitys != null) (update as UpdateProvider<TEntity>)._source.AddRange(entitys.Where(a => a != null)); //防止 Aop.AuditValue 触发两次
+            if (entitys != null)
+            {
+                (update as UpdateProvider<TEntity>)._source.AddRange(entitys.Where(a => a != null)); //防止 Aop.AuditValue 触发两次
+                if (_db.Options.AuditValue != null)
+                    foreach (var item in entitys)
+                        _db.Options.AuditValue(new DbContextAuditValueEventArgs(Aop.AuditValueType.Update, _table.Type, item));
+            }
             return update;
         }
         protected virtual IDelete<TEntity> OrmDelete(object dywhere)
@@ -93,6 +110,12 @@ namespace FreeSql
             if (_db.Options.EnableGlobalFilter == false) delete.DisableGlobalFilter();
             return delete;
         }
+        protected virtual IDelete<object> OrmDeleteAsType(Type entityType)
+        {
+			var delete = _db.OrmOriginal.Delete<object>().AsType(entityType).WithTransaction(_uow?.GetOrBeginTransaction());
+			if (_db.Options.EnableGlobalFilter == false) delete.DisableGlobalFilter();
+			return delete;
+		}
 
         internal void EnqueueToDbContext(DbContext.EntityChangeType changeType, EntityState state) =>
             _db.EnqueuePreCommand(changeType, this, typeof(EntityState), _entityType, state);
@@ -343,12 +366,13 @@ namespace FreeSql
             }
             else
             {
-                if (_states.ContainsKey(key))
-                {
-                    if (isThrow) throw new Exception(DbContextStrings.CannotAdd_AlreadyExistsInStateManagement(_db.OrmOriginal.GetEntityString(_entityType, data)));
-                    return false;
-                }
-                if (_db.OrmOriginal.Ado.DataType == DataType.ClickHouse) return true;
+				//不可添加，已存在于状态管理
+				//if (_states.ContainsKey(key))
+				//{
+				//    if (isThrow) throw new Exception(DbContextStrings.CannotAdd_AlreadyExistsInStateManagement(_db.OrmOriginal.GetEntityString(_entityType, data)));
+				//    return false;
+				//}
+				if (_db.OrmOriginal.Ado.DataType == DataType.ClickHouse) return true;
                 var idval = _db.OrmOriginal.GetEntityIdentityValueWithPrimary(_entityType, data);
                 if (idval > 0)
                 {

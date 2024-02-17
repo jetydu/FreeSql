@@ -18,12 +18,12 @@
 		<SignAssembly>true</SignAssembly>
 		<AssemblyOriginatorKeyFile>key.snk</AssemblyOriginatorKeyFile>
 		<DelaySign>false</DelaySign>
-		<Version>3.2.806-preview20231128</Version>
+		<Version>3.2.813-preview20240208</Version>
 		<PackageReadmeFile>readme.md</PackageReadmeFile>
 	</PropertyGroup>
 
 	<ItemGroup>
-		<None Include="../../readme.md" Pack="true" PackagePath="\"/>
+		<None Include="../../readme.md" Pack="true" PackagePath="\" />
 		<None Include="../../logo.png" Pack="true" PackagePath="\" />
 	</ItemGroup>
 
@@ -35,7 +35,7 @@
 		<DocumentationFile>FreeSql.Extensions.AggregateRoot.xml</DocumentationFile>
 		<WarningLevel>3</WarningLevel>
 	</PropertyGroup>
-	
+
 	<PropertyGroup Condition="'$(TargetFramework)' == 'net40'">
 		<DefineConstants>net40</DefineConstants>
 	</PropertyGroup>

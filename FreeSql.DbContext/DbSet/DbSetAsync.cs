@@ -265,10 +265,8 @@ namespace FreeSql
 
                         if (curList.Any() == false) //全部删除
                         {
-                            var delall = _db.OrmOriginal.Delete<object>()
-                                .AsType(tref.RefMiddleEntityType)
-                                .WithTransaction(_uow?.GetOrBeginTransaction());
-                            foreach (var midWhere in midWheres) delall.Where(midWhere);
+							var delall = OrmDeleteAsType(tref.RefMiddleEntityType);
+							foreach (var midWhere in midWheres) delall.Where(midWhere);
                             var sql = delall.ToSql();
                             await delall.ExecuteAffrowsAsync(cancellationToken);
                             _db._entityChangeReport.Add(new DbContext.EntityChangeReport.ChangeInfo { EntityType = _entityType, Object = sql, Type = DbContext.EntityChangeType.SqlRaw });
@@ -509,7 +507,7 @@ namespace FreeSql
                 await UpdateRangePrivAsync(new[] { data }, false, cancellationToken);
                 await DbContextFlushCommandAsync(cancellationToken);
                 affrows = _db._affrows - affrows;
-                if (affrows > 0) return;
+                return;
             }
             if (CanAdd(data, false))
             {

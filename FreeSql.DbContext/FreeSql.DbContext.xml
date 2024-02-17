@@ -130,6 +130,26 @@
             实体变化事件
             </summary>
         </member>
+        <member name="F:FreeSql.DbContextOptions.AuditValue">
+            <summary>
+            DbContext/Repository 审计值，适合 Scoped IOC 中获取登陆信息
+            </summary>
+        </member>
+        <member name="P:FreeSql.DbContextAuditValueEventArgs.AuditValueType">
+            <summary>
+            类型
+            </summary>
+        </member>
+        <member name="P:FreeSql.DbContextAuditValueEventArgs.EntityType">
+            <summary>
+            类型
+            </summary>
+        </member>
+        <member name="P:FreeSql.DbContextAuditValueEventArgs.Object">
+            <summary>
+            实体对象
+            </summary>
+        </member>
         <member name="M:FreeSql.DbSet`1.AsType(System.Type)">
             <summary>
             动态Type，在使用 DbSet&lt;object&gt; 后使用本方法，指定实体类型
@@ -552,6 +572,12 @@
             </summary>
             <param name="rule"></param>
         </member>
+        <member name="M:FreeSql.IBaseRepository.AsTable(System.Func{System.Type,System.String,System.String})">
+            <summary>
+            分表规则，参数：实体类型、旧表名；返回：新表名 https://github.com/2881099/FreeSql/wiki/Repository
+            </summary>
+            <param name="rule"></param>
+        </member>
         <member name="P:FreeSql.IBaseRepository.DbContextOptions">
             <summary>
             设置 DbContext 选项
@@ -731,15 +757,6 @@
             <param name="codeFirst"></param>
             <param name="entityType">实体类型</param>
             <param name="modelBuilder"></param>
-            <returns></returns>
-        </member>
-        <member name="M:FreeSqlDbContextExtensions.ApplyConfigurationsFromAssembly(FreeSql.ICodeFirst,System.Reflection.Assembly,System.Func{System.Type,System.Boolean})">
-            <summary>
-            根据Assembly扫描所有继承IEntityTypeConfiguration&lt;T&gt;的配置类
-            </summary>
-            <param name="codeFirst"></param>
-            <param name="assembly"></param>
-            <param name="predicate"></param>
             <returns></returns>
         </member>
         <member name="M:FreeSqlDbContextExtensions.CreateDbContext(IFreeSql)">

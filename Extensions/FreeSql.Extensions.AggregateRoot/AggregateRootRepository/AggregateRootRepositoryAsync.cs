@@ -209,9 +209,10 @@ namespace FreeSql
             }
             var affrows = 0;
             for (var a = tracking.DeleteLog.Count - 1; a >= 0; a--)
-            {
-                affrows += await Orm.Delete<object>().AsType(tracking.DeleteLog[a].Item1).AsTable(_asTableRule)
-                    .WhereDynamic(tracking.DeleteLog[a].Item2).ExecuteAffrowsAsync(cancellationToken);
+			{
+				var delete = Orm.Delete<object>().AsType(tracking.DeleteLog[a].Item1);
+				if (_asTableRule != null) delete.AsTable(old => _asTableRule(tracking.DeleteLog[a].Item1, old));
+				affrows += await delete.WhereDynamic(tracking.DeleteLog[a].Item2).ExecuteAffrowsAsync(cancellationToken);
                 if (deletedOutput != null) deletedOutput.AddRange(tracking.DeleteLog[a].Item2);
                 UnitOfWork?.EntityChangeReport?.Report.AddRange(tracking.DeleteLog[a].Item2.Select(x =>
                     new DbContext.EntityChangeReport.ChangeInfo
@@ -249,9 +250,10 @@ namespace FreeSql
             }
 
             for (var a = tracking.DeleteLog.Count - 1; a >= 0; a--)
-            {
-                affrows += await Orm.Delete<object>().AsType(tracking.DeleteLog[a].Item1).AsTable(_asTableRule)
-                    .WhereDynamic(tracking.DeleteLog[a].Item2).ExecuteAffrowsAsync(cancellationToken);
+			{
+				var delete = Orm.Delete<object>().AsType(tracking.DeleteLog[a].Item1);
+				if (_asTableRule != null) delete.AsTable(old => _asTableRule(tracking.DeleteLog[a].Item1, old));
+				affrows += await delete.WhereDynamic(tracking.DeleteLog[a].Item2).ExecuteAffrowsAsync(cancellationToken);
                 UnitOfWork?.EntityChangeReport?.Report.AddRange(tracking.DeleteLog[a].Item2.Select(x =>
                     new DbContext.EntityChangeReport.ChangeInfo
                     {
@@ -261,7 +263,28 @@ namespace FreeSql
                     }));
             }
 
-            var updateLogDict = tracking.UpdateLog.GroupBy(a => a.Item1).ToDictionary(a => a.Key, a => tracking.UpdateLog.Where(b => b.Item1 == a.Key).Select(b => new
+            if (_repository.DbContextOptions.AuditValue != null)
+            {
+                foreach (var log in tracking.UpdateLog)
+                {
+                    var table = Orm.CodeFirst.GetTableByEntity(log.Item1);
+                    _repository.DbContextOptions.AuditValue(new DbContextAuditValueEventArgs(Aop.AuditValueType.Update, log.Item1, log.Item3));
+                    log.Item4.Clear();
+                    foreach (var col in table.ColumnsByCs.Values)
+                    {
+                        if (table.ColumnsByCsIgnore.ContainsKey(col.CsName)) continue;
+                        if (table.ColumnsByCs.ContainsKey(col.CsName))
+                        {
+                            if (col.Attribute.IsVersion) continue;
+                            var propvalBefore = table.GetPropertyValue(log.Item2, col.CsName);
+                            var propvalAfter = table.GetPropertyValue(log.Item3, col.CsName);
+                            if (AggregateRootUtils.CompareEntityPropertyValue(col.CsType, propvalBefore, propvalAfter) == false) log.Item4.Add(col.CsName);
+                            continue;
+                        }
+                    }
+                }
+            }
+            var updateLogDict = tracking.UpdateLog.GroupBy(a => a.Item1).ToDictionary(a => a.Key, a => tracking.UpdateLog.Where(b => b.Item1 == a.Key && b.Item4.Any()).Select(b => new
             {
                 BeforeObject = b.Item2,
                 AfterObject = b.Item3,
@@ -274,8 +297,10 @@ namespace FreeSql
             {
                 foreach (var dl2 in dl.Value)
                 {
-                    affrows += await Orm.Update<object>().AsType(dl.Key).AsTable(_asTableRule)
-                        .SetSource(dl2.Value.Select(a => a.AfterObject).ToArray())
+					var update = Orm.Update<object>().AsType(dl.Key);
+					if (_asTableRule != null) update.AsTable(old => _asTableRule(dl.Key, old));
+					affrows += await update
+						.SetSource(dl2.Value.Select(a => a.AfterObject).ToArray())
                         .UpdateColumns(dl2.Value.First().UpdateColumns.ToArray())
                         .ExecuteAffrowsAsync(cancellationToken);
                     UnitOfWork?.EntityChangeReport?.Report.AddRange(dl2.Value.Select(x =>

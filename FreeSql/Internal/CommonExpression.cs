@@ -531,7 +531,7 @@ namespace FreeSql.Internal
                                 parent.Childs.Add(child);
                                 if (dtTb.Parameter != null)
                                     ReadAnonymousField(_tables, _tableRule, field, child, ref index, Expression.Property(
-                                        dtTb.Parameter.Type == dtTb.Table.Type ? (Expression)dtTb.Parameter : Expression.TypeAs(dtTb.Parameter, dtTb.Table.Type), 
+                                        dtTb.Parameter.Type == dtTb.Table.Type ? (Expression)dtTb.Parameter : Expression.TypeAs(dtTb.Parameter, dtTb.Table.Type),
                                         dtTb.Table.Properties[trydtocol.CsName]), select, diymemexp, whereGlobalFilter, findIncludeMany, findSubSelectMany, isAllDtoMap);
                                 else
                                 {
@@ -708,7 +708,7 @@ namespace FreeSql.Internal
         public string ExpressionWhereLambdaNoneForeignObject(List<SelectTableInfo> _tables, Func<Type, string, string> _tableRule, TableInfo table, List<SelectColumnInfo> _selectColumnMap, Expression exp, BaseDiyMemberExpression diymemexp, List<DbParameter> dbParams)
         {
             var sql = ExpressionLambdaToSql(exp, new ExpTSC { _tables = _tables, _tableRule = _tableRule, _selectColumnMap = _selectColumnMap, diymemexp = diymemexp, tbtype = SelectTableInfoType.From, isQuoteName = true, isDisableDiyParse = false, style = ExpressionStyle.Where, currentTable = table, dbParams = dbParams });
-            return GetBoolString(exp, sql);
+            return GetBoolString(exp, SearchColumnByField(_tables, null, sql), sql);
         }
 
         public string ExpressionWhereLambda(List<SelectTableInfo> _tables, Func<Type, string, string> _tableRule, Expression exp, BaseDiyMemberExpression diymemexp, List<GlobalFilter.Item> whereGlobalFilter, List<DbParameter> dbParams)
@@ -720,7 +720,7 @@ namespace FreeSql.Internal
                         tb.Alias = tb.Parameter.Name;
             }
             var sql = ExpressionLambdaToSql(exp, new ExpTSC { _tables = _tables, _tableRule = _tableRule, diymemexp = diymemexp, tbtype = SelectTableInfoType.From, isQuoteName = true, isDisableDiyParse = false, style = ExpressionStyle.Where, whereGlobalFilter = whereGlobalFilter, dbParams = dbParams });
-            return GetBoolString(exp, sql);
+            return GetBoolString(exp, SearchColumnByField(_tables, null, sql), sql);
         }
         static ConcurrentDictionary<string, Regex> dicRegexAlias = new ConcurrentDictionary<string, Regex>();
         public void ExpressionJoinLambda(List<SelectTableInfo> _tables, Func<Type, string, string> _tableRule, SelectTableInfoType tbtype, Expression exp, BaseDiyMemberExpression diymemexp, List<GlobalFilter.Item> whereGlobalFilter)
@@ -733,7 +733,7 @@ namespace FreeSql.Internal
                         tb.Alias = tb.Parameter.Name;
             }
             var sql = ExpressionLambdaToSql(exp, new ExpTSC { _tables = _tables, _tableRule = _tableRule, diymemexp = diymemexp, tbtype = tbtype, isQuoteName = true, isDisableDiyParse = false, style = ExpressionStyle.Where, whereGlobalFilter = whereGlobalFilter });
-            sql = GetBoolString(exp, sql);
+            sql = GetBoolString(exp, SearchColumnByField(_tables, null, sql), sql);
 
             if (_tables.Count > tbidx)
             {
@@ -765,11 +765,11 @@ namespace FreeSql.Internal
         static MethodInfo MethodDateTimeSubtractTimeSpan = typeof(DateTime).GetMethod("Subtract", new Type[] { typeof(TimeSpan) });
         static MethodInfo MethodMathFloor = typeof(Math).GetMethod("Floor", new Type[] { typeof(double) });
 
-        public string GetBoolString(Expression exp, string sql)
+        public string GetBoolString(Expression exp, ColumnInfo column, string sql)
         {
             var isBool = exp.Type.NullableTypeOrThis() == typeof(bool);
             if (exp.NodeType == ExpressionType.MemberAccess && isBool && sql.Contains(" IS ") == false && sql.Contains(" = ") == false)
-                return $"{sql} = {formatSql(true, null, null, null)}";
+                return $"{sql} = {formatSql(true, column?.Attribute.MapType, null, null)}";
             if (isBool)
                 return GetBoolString(sql);
             return sql;
@@ -818,11 +818,13 @@ namespace FreeSql.Internal
                     if (oper == "OR")
                     {
                         var leftBool = ExpressionLambdaToSql(leftExp, tsc);
-                        if (SearchColumnByField(tsc._tables, tsc.currentTable, leftBool) != null) leftBool = $"{leftBool} = {formatSql(true, null, null, null)}";
+                        var leftColumn = SearchColumnByField(tsc._tables, tsc.currentTable, leftBool);
+                        if (leftColumn != null) leftBool = $"{leftBool} = {formatSql(true, leftColumn.Attribute.MapType, null, null)}";
                         else leftBool = GetBoolString(leftBool);
 
                         var rightBool = ExpressionLambdaToSql(rightExp, tsc);
-                        if (SearchColumnByField(tsc._tables, tsc.currentTable, rightBool) != null) rightBool = $"{rightBool} = {formatSql(true, null, null, null)}";
+                        var rightColumn = SearchColumnByField(tsc._tables, tsc.currentTable, rightBool);
+                        if (rightColumn != null) rightBool = $"{rightBool} = {formatSql(true, rightColumn.Attribute.MapType, null, null)}";
                         else rightBool = GetBoolString(rightBool);
                         if (_common._orm?.Ado?.DataType == DataType.QuestDb) return $"(({leftBool}) {oper} ({rightBool}))";
                         return $"({leftBool} {oper} {rightBool})";
@@ -864,7 +866,7 @@ namespace FreeSql.Internal
             var isRightMapType = false;
             if (isLeftMapType) oldMapType = tsc.SetMapTypeReturnOld(leftMapColumn.Attribute.MapType);
 
-            var right = (leftMapColumn != null && 
+            var right = (leftMapColumn != null &&
                 (leftMapColumn.Table.AsTableColumn == leftMapColumn && rightExp.IsParameter() == false)) ? //自动分表
                 formatSql(Expression.Lambda(rightExp).Compile().DynamicInvoke(), leftMapColumn.Attribute.MapType, leftMapColumn, tsc.dbParams) :
                 ExpressionLambdaToSql(rightExp, tsc);
@@ -890,9 +892,9 @@ namespace FreeSql.Internal
                 if (isRightMapType)
                 {
                     oldMapType = tsc.SetMapTypeReturnOld(rightMapColumn.Attribute.MapType);
-                    left = (rightMapColumn != null && 
+                    left = (rightMapColumn != null &&
                         (rightMapColumn.Table.AsTableColumn == rightMapColumn && leftExp.IsParameter() == false)) ? //自动分表
-                        formatSql(Expression.Lambda(leftExp).Compile().DynamicInvoke(), rightMapColumn.Attribute.MapType, rightMapColumn, tsc.dbParams) : 
+                        formatSql(Expression.Lambda(leftExp).Compile().DynamicInvoke(), rightMapColumn.Attribute.MapType, rightMapColumn, tsc.dbParams) :
                         ExpressionLambdaToSql(leftExp, tsc);
                     if (left != "NULL" && isRightMapType &&
                         //判断参数化后的bug
@@ -946,10 +948,10 @@ namespace FreeSql.Internal
                     break;
                 case "AND":
                 case "OR":
-                    if (leftMapColumn != null) left = $"{left} = {formatSql(true, null, null, null)}";
+                    if (leftMapColumn != null) left = $"{left} = {formatSql(true, leftMapColumn.Attribute.MapType, null, null)}";
                     else left = GetBoolString(left);
                     if (rightMapColumn == null) rightMapColumn = SearchColumnByField(tsc._tables, tsc.currentTable, right);
-                    if (rightMapColumn != null) right = $"{right} = {formatSql(true, null, null, null)}";
+                    if (rightMapColumn != null) right = $"{right} = {formatSql(true, rightMapColumn.Attribute.MapType, null, null)}";
                     else right = GetBoolString(right);
                     break;
             }
@@ -976,14 +978,14 @@ namespace FreeSql.Internal
                     _common._orm.Aop.ParseExpressionHandler(this, args);
                     if (string.IsNullOrEmpty(args.Result) == false) return args.Result;
                 }
-                ParseExpressionNoAsSelect(this, args, tsc._tableRule, tsc.whereGlobalFilter);
+                ParseExpressionNoAsSelect(this, args, tsc._tableRule, tsc.whereGlobalFilter, tsc.dbParams);
                 if (string.IsNullOrEmpty(args.Result) == false) return args.Result;
             }
             switch (exp.NodeType)
             {
                 case ExpressionType.Not:
                     var notExp = (exp as UnaryExpression)?.Operand;
-                    if (notExp.Type.IsNumberType())return _common.BitNot(ExpressionLambdaToSql(notExp, tsc)); //位操作
+                    if (notExp.Type.IsNumberType()) return _common.BitNot(ExpressionLambdaToSql(notExp, tsc)); //位操作
                     if (notExp.NodeType == ExpressionType.MemberAccess)
                     {
                         var notBody = ExpressionLambdaToSql(notExp, tsc);
@@ -999,7 +1001,7 @@ namespace FreeSql.Internal
                 case ExpressionType.Invoke: //#1378
                     var invokeExp = exp as InvocationExpression;
                     var invokeReplaceExp = invokeExp.Expression;
-                    var invokeLambdaExp = invokeReplaceExp as LambdaExpression; 
+                    var invokeLambdaExp = invokeReplaceExp as LambdaExpression;
                     if (invokeLambdaExp == null) return formatSql(Expression.Lambda(exp).Compile().DynamicInvoke(), tsc.mapType, tsc.mapColumnTmp, tsc.dbParams);
                     var invokeReplaceVistor = new FreeSql.Internal.CommonExpression.ReplaceVisitor();
                     var len = Math.Min(invokeExp.Arguments.Count, invokeLambdaExp.Parameters.Count);
@@ -1835,7 +1837,7 @@ namespace FreeSql.Internal
                     }
                     if (callExp != null) return ExpressionLambdaToSql(callExp, tsc);
                     var diymemexps = new[] { tsc.diymemexp, tsc.subSelect001?._diymemexpWithTempQuery };
-                    if (_subSelectParentDiyMemExps.Value?.Any() == true) 
+                    if (_subSelectParentDiyMemExps.Value?.Any() == true)
                         diymemexps = diymemexps.Concat(_subSelectParentDiyMemExps.Value).ToArray();
                     foreach (var diymemexp in diymemexps)
                     {
@@ -2267,10 +2269,18 @@ namespace FreeSql.Internal
                             else
                                 return Expression.Lambda(exp).Compile().DynamicInvoke();
                             break;
+                        case ExpressionType.Call:
+                            if (exp.IsParameter() == false)
+                                return Expression.Lambda(exp).Compile().DynamicInvoke();
+                            break;
                     }
                     while (expStack.Any())
                     {
-                        if (firstValue == null) throw new Exception(CoreStrings.Cannot_Be_NULL_Name(exp));
+                        if (firstValue == null)
+                        {
+                            success = false;
+                            return null;
+                        }
                         var expStackItem = expStack.Pop() as MemberExpression;
                         if (expStackItem.Member.MemberType == MemberTypes.Property)
                             firstValue = ((PropertyInfo)expStackItem.Member).GetValue(firstValue, null);
@@ -2422,7 +2432,7 @@ namespace FreeSql.Internal
                             currentTable = tb.Table,
                             alias001 = tb.Alias
                         });
-                        whereSql = GetBoolString(expExp.Body, whereSql);
+                        whereSql = GetBoolString(expExp.Body, null, whereSql);
                         if (isEmpty == false)
                             sb.Append(" AND ");
                         else
@@ -2492,8 +2502,8 @@ namespace FreeSql.Internal
             public LambdaExpression Modify(LambdaExpression lambda, List<SelectTableInfo> tables)
             {
                 this.tables = tables.Where(a => a.Type != SelectTableInfoType.Parent).ToList();
-                parameters = this.tables.Select(a => a.Parameter ?? 
-                    Expression.Parameter(a.Table.Type, 
+                parameters = this.tables.Select(a => a.Parameter ??
+                    Expression.Parameter(a.Table.Type,
                         a.Alias.StartsWith("SP10") ? a.Alias.Replace("SP10", "ht") : a.Alias)).ToArray();
                 lambdaHzyParameter = lambda.Parameters.FirstOrDefault();
                 var exp = Visit(lambda.Body);
@@ -2562,6 +2572,7 @@ namespace FreeSql.Internal
         {
             if (tb == null || dtoProp == null || tb.Parameter == null) return null;
             var retList = new List<Expression[]>();
+            var matchIgnores = new Dictionary<PropertyInfo, bool>();
             var retExp = LocalMatch(tb.Parameter.Type, tb.Parameter);
             if (retList.Any() == false) retList.Add(new[] { retExp });
             return retList;
@@ -2578,6 +2589,8 @@ namespace FreeSql.Internal
                         if (Utils.dicExecuteArrayRowReadClassOrTuple.ContainsKey(typeProp.PropertyType)) continue;
                         if (typeProp.PropertyType.IsAnonymousType() || _common.GetTableByEntity(typeProp.PropertyType)?.Columns.Any() == true)
                         {
+                            if (matchIgnores.ContainsKey(typeProp)) continue;
+                            matchIgnores.Add(typeProp, true);
                             var nextExp = Expression.MakeMemberAccess(memExp, typeProp);
                             var ret = LocalMatch(typeProp.PropertyType, nextExp);
                             if (ret != null)
@@ -2605,7 +2618,7 @@ namespace FreeSql.Internal
             }
         }
 
-        public static void ParseExpressionNoAsSelect(object sender, Aop.ParseExpressionEventArgs e, Func<Type, string, string> tableRule, List<GlobalFilter.Item> whereGlobalFilter)
+        public static void ParseExpressionNoAsSelect(object sender, Aop.ParseExpressionEventArgs e, Func<Type, string, string> tableRule, List<GlobalFilter.Item> whereGlobalFilter, List<DbParameter> dbParams)
         {
             if (e.Expression.NodeType != ExpressionType.Call &&
                 (e.Expression as MemberExpression)?.Member.Name != "Count") return;
@@ -2683,6 +2696,7 @@ namespace FreeSql.Internal
                         var mtmReftbname = e.FreeParse(Expression.MakeMemberAccess(memberExp.Expression, exp3Tb.Properties[exp3Tb.ColumnsByPosition[0].CsName]));
                         mtmReftbname = mtmReftbname.Substring(0, mtmReftbname.Length - commonExp._common.QuoteSqlName(exp3Tb.ColumnsByPosition[0].Attribute.Name).Length - 1);
                         var midSelect = commonExp._common._orm.Select<object>().As($"M{select._tables[0].Alias}_M{mtmReftbname}").AsType(memberTbref.RefMiddleEntityType) as Select1Provider<object>;
+                        if (dbParams != null) midSelect.WithParameters(dbParams);
                         if (tableRule != null) midSelect._tableRules.Add(tableRule);
                         if (whereGlobalFilter != null)
                         {
@@ -2746,6 +2760,7 @@ namespace FreeSql.Internal
                     Type = SelectTableInfoType.Parent,
                     Parameter = a.Parameter
                 }));
+                if (dbParams != null) select.WithParameters(dbParams);
                 if (tableRule != null) select._tableRules.Add(tableRule);
                 if (whereGlobalFilter != null)
                 {

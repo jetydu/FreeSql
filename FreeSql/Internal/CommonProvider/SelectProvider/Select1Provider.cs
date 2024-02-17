@@ -525,9 +525,11 @@ namespace FreeSql.Internal.CommonProvider
         }
         public ISelect<T1> WithMemory(IEnumerable<T1> source)
         {
-            var sb = new StringBuilder();
+            var list = source?.Select(a => (object)a).ToList();
+            if (list.Any() != true) throw new Exception(CoreStrings.Cannot_Be_NULL_Name(nameof(source)));
+			var sb = new StringBuilder();
             (_orm.InsertOrUpdate<object>().AsType(_tables[0].Table.Type) as InsertOrUpdateProvider<object>)
-                .WriteSourceSelectUnionAll(source.Select(a => (object)a).ToList(), sb, _params);
+                .WriteSourceSelectUnionAll(list, sb, _params, true);
 
             try { return WithSql(sb.ToString()); }
             finally { sb.Clear(); }
@@ -865,7 +867,20 @@ namespace FreeSql.Internal.CommonProvider
 #endif
 
                 var list = listObj as List<T1>;
-                if (list == null) return;
+                if (list == null)
+                {
+                    if (typeof(T1) == typeof(object))
+                    {
+                        var ilist = listObj as IList;
+                        if (ilist != null)
+                        {
+                            list = new List<T1>();
+                            foreach (var iitem in ilist)
+                                list.Add((T1)iitem);
+                        }
+                    }
+                    if (list == null) return;
+                }
                 if (list.Any() == false) return;
                 if (tbref.Columns.Any() == false) return;
 

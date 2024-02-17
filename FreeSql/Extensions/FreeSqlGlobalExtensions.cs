@@ -163,6 +163,7 @@ public static partial class FreeSqlGlobalExtensions
     public static object CreateInstanceGetDefaultValue(this Type that)
     {
         if (that == null) return null;
+        if (that == typeof(void)) return null;
         if (that == typeof(string)) return default(string);
         if (that == typeof(Guid)) return default(Guid);
         if (that == typeof(byte[])) return default(byte[]);
@@ -750,14 +751,14 @@ JOIN {select._commonUtils.QuoteSqlName(tbDbName)} a ON cte_tbc.cte_id = a.{selec
                 case DataType.CustomSqlServer:
                 case DataType.Firebird:
                 case DataType.ClickHouse:
-                    sql1ctePath = select._commonExpression.ExpressionWhereLambda(select._tables, select._tableRule, Expression.Call(typeof(Convert).GetMethod("ToString", new Type[] { typeof(string) }), pathSelector?.Body), select._diymemexpWithTempQuery, null, null);
+                    sql1ctePath = select._commonExpression.ExpressionWhereLambda(select._tables, select._tableRule, 
+                        Expression.Call(typeof(Convert).GetMethod("ToString", new Type[] { typeof(string) }), pathSelector?.Body), select._diymemexpWithTempQuery, null, null);
                     break;
                 case DataType.MySql:
                 case DataType.OdbcMySql:
                 case DataType.CustomMySql:
                     sql1ctePath = select._commonExpression.ExpressionWhereLambda(select._tables, select._tableRule, pathSelector?.Body, select._diymemexpWithTempQuery, null, null);
                     sql1ctePath = $"CAST({sql1ctePath} as char(2000))";
-                    wct2ctePath = sql1ctePath;
                     break;
                 default:
                     sql1ctePath = select._commonExpression.ExpressionWhereLambda(select._tables, select._tableRule, pathSelector?.Body, select._diymemexpWithTempQuery, null, null);
@@ -779,7 +780,17 @@ JOIN {select._commonUtils.QuoteSqlName(tbDbName)} a ON cte_tbc.cte_id = a.{selec
         {
             select._tables[0].Parameter = pathSelector?.Parameters[0];
             if (wct2ctePath == null)
+            {
                 wct2ctePath = select._commonExpression.ExpressionWhereLambda(select._tables, select._tableRule, pathSelector?.Body, select._diymemexpWithTempQuery, null, null);
+                switch (select._orm.Ado.DataType)
+                {
+                    case DataType.MySql:
+                    case DataType.OdbcMySql:
+                    case DataType.CustomMySql:
+                        wct2ctePath = $"CAST({wct2ctePath} as char(2000))";
+                        break;
+                }
+            }
             sql2ctePath = select._commonUtils.StringConcat(
                 new string[] {
                     up == false ? "wct1.cte_path" : wct2ctePath,

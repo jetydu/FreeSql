@@ -47,6 +47,21 @@ namespace FreeSql.Internal
                 ) return null;
             var tbc = _cacheGetTableByEntity.GetOrAdd(common._orm.Ado.DataType, k1 => new ConcurrentDictionary<Type, TableInfo>()); //区分数据库类型缓存
             if (tbc.TryGetValue(entity, out var trytb)) return trytb;
+            if (entity == typeof(object))
+            {
+                var columnsEmpty = new ColumnInfo[0];
+                return new TableInfo
+                {
+                    Type = entity,
+                    CsName = entity.Name,
+                    DbName = entity.Name,
+                    DisableSyncStructure = true,
+                    ColumnsByPosition = columnsEmpty,
+                    ColumnsByCanUpdateDbUpdateValue = columnsEmpty,
+                    Primarys = columnsEmpty,
+                    Indexes = new IndexInfo[0],
+                };
+            };
             if (common.CodeFirst.GetDbInfo(entity) != null) return null;
             if (typeof(IEnumerable).IsAssignableFrom(entity) && entity.IsGenericType == true) return null;
             if (entity.IsArray) return null;
@@ -245,16 +260,21 @@ namespace FreeSql.Internal
 			if (entityDefault != null) defaultValue = trytb.Properties[csName].GetValue(entityDefault, null);
 			if (defaultValue != null && mapType.IsEnum)
 			{
-				var isEqualsEnumValue = false;
-				var enumValues = Enum.GetValues(mapType);
-				for (var a = 0; a < enumValues.Length; a++)
-					if (object.Equals(defaultValue, enumValues.GetValue(a)))
-					{
-						isEqualsEnumValue = true;
-						break;
-					}
-				if (isEqualsEnumValue == false && enumValues.Length > 0)
-					defaultValue = enumValues.GetValue(0);
+                Array enumValues = null;
+                try { enumValues = Enum.GetValues(mapType); } //AOT error
+                catch { }
+                if (enumValues != null)
+                {
+                    var isEqualsEnumValue = false;
+                    for (var a = 0; a < enumValues.Length; a++)
+                        if (object.Equals(defaultValue, enumValues.GetValue(a)))
+                        {
+                            isEqualsEnumValue = true;
+                            break;
+                        }
+                    if (isEqualsEnumValue == false && enumValues.Length > 0)
+                        defaultValue = enumValues.GetValue(0);
+                }
 			}
 			if (defaultValue != null && mapType != colattr.MapType) defaultValue = Utils.GetDataReaderValue(colattr.MapType, defaultValue);
 			if (defaultValue == null) defaultValue = tp?.defaultValue;
@@ -347,22 +367,26 @@ namespace FreeSql.Internal
 			if (colattr.MapType.NullableTypeOrThis() == typeof(string) && colattr.StringLength != 0)
 			{
 				int strlen = colattr.StringLength;
-				var charPatten = @"(CHARACTER|CHAR2|CHAR)\s*(\([^\)]*\))?";
+				var charPattern = @"(CHARACTER|CHAR2|CHAR)\s*(\([^\)]*\))?";
+                var replaceCounter = 0;
 				var strNotNull = colattr.IsNullable == false ? " NOT NULL" : "";
 				switch (common._orm.Ado.DataType)
 				{
 					case DataType.MySql:
 					case DataType.OdbcMySql:
 					case DataType.CustomMySql:
-						if (strlen == -2) colattr.DbType = $"LONGTEXT{strNotNull}";
-						else if (strlen < 0) colattr.DbType = $"TEXT{strNotNull}";
-						else colattr.DbType = Regex.Replace(colattr.DbType, charPatten, $"$1({strlen})");
+                        if (strlen == -2) colattr.DbType = $"LONGTEXT{strNotNull}";
+                        else if (strlen < 0) colattr.DbType = $"TEXT{strNotNull}";
+                        else colattr.DbType = Regex.Replace(colattr.DbType, charPattern, m =>
+							replaceCounter++ == 0 ? $"{m.Groups[1].Value}({strlen})" : m.Groups[0].Value);
 						break;
 					case DataType.SqlServer:
 					case DataType.OdbcSqlServer:
 					case DataType.CustomSqlServer:
-						if (strlen < 0) colattr.DbType = Regex.Replace(colattr.DbType, charPatten, $"$1(MAX)");
-						else colattr.DbType = Regex.Replace(colattr.DbType, charPatten, $"$1({strlen})");
+						if (strlen < 0) colattr.DbType = Regex.Replace(colattr.DbType, charPattern, m =>
+							replaceCounter++ == 0 ? $"{m.Groups[1].Value}(MAX)" : m.Groups[0].Value);
+						else colattr.DbType = Regex.Replace(colattr.DbType, charPattern, m =>
+							replaceCounter++ == 0 ? $"{m.Groups[1].Value}({strlen})" : m.Groups[0].Value);
 						break;
 					case DataType.PostgreSQL:
 					case DataType.OdbcPostgreSQL:
@@ -371,39 +395,48 @@ namespace FreeSql.Internal
 					case DataType.OdbcKingbaseES:
 					case DataType.ShenTong:
 						if (strlen < 0) colattr.DbType = $"TEXT{strNotNull}";
-						else colattr.DbType = Regex.Replace(colattr.DbType, charPatten, $"$1({strlen})");
+						else colattr.DbType = Regex.Replace(colattr.DbType, charPattern, m =>
+							replaceCounter++ == 0 ? $"{m.Groups[1].Value}({strlen})" : m.Groups[0].Value);
 						break;
 					case DataType.Oracle:
 					case DataType.CustomOracle:
 						if (strlen < 0) colattr.DbType = $"NCLOB{strNotNull}"; //v1.3.2+ https://github.com/dotnetcore/FreeSql/issues/259
-						else colattr.DbType = Regex.Replace(colattr.DbType, charPatten, $"$1({strlen})");
+						else colattr.DbType = Regex.Replace(colattr.DbType, charPattern, m =>
+							replaceCounter++ == 0 ? $"{m.Groups[1].Value}({strlen})" : m.Groups[0].Value);
 						break;
 					case DataType.Dameng:
 						if (strlen < 0) colattr.DbType = $"TEXT{strNotNull}";
-						else colattr.DbType = Regex.Replace(colattr.DbType, charPatten, $"$1({strlen})");
+						else colattr.DbType = Regex.Replace(colattr.DbType, charPattern, m =>
+							replaceCounter++ == 0 ? $"{m.Groups[1].Value}({strlen})" : m.Groups[0].Value);
 						break;
 					case DataType.OdbcOracle:
 					case DataType.OdbcDameng:
-						if (strlen < 0) colattr.DbType = Regex.Replace(colattr.DbType, charPatten, $"$1(4000)"); //ODBC 不支持 NCLOB
-						else colattr.DbType = Regex.Replace(colattr.DbType, charPatten, $"$1({strlen})");
+						if (strlen < 0) colattr.DbType = Regex.Replace(colattr.DbType, charPattern, m =>
+							replaceCounter++ == 0 ? $"{m.Groups[1].Value}(4000)" : m.Groups[0].Value); //ODBC 不支持 NCLOB
+						else colattr.DbType = Regex.Replace(colattr.DbType, charPattern, m =>
+							replaceCounter++ == 0 ? $"{m.Groups[1].Value}({strlen})" : m.Groups[0].Value);
 						break;
 					case DataType.Sqlite:
 						if (strlen < 0) colattr.DbType = $"TEXT{strNotNull}";
-						else colattr.DbType = Regex.Replace(colattr.DbType, charPatten, $"$1({strlen})");
+						else colattr.DbType = Regex.Replace(colattr.DbType, charPattern, m =>
+							replaceCounter++ == 0 ? $"{m.Groups[1].Value}({strlen})" : m.Groups[0].Value);
 						break;
 					case DataType.MsAccess:
-						charPatten = @"(CHAR|CHAR2|CHARACTER|TEXT)\s*(\([^\)]*\))?";
+						charPattern = @"(CHAR|CHAR2|CHARACTER|TEXT)\s*(\([^\)]*\))?";
 						if (strlen < 0) colattr.DbType = $"LONGTEXT{strNotNull}";
-						else colattr.DbType = Regex.Replace(colattr.DbType, charPatten, $"$1({strlen})");
+						else colattr.DbType = Regex.Replace(colattr.DbType, charPattern, m =>
+							replaceCounter++ == 0 ? $"{m.Groups[1].Value}({strlen})" : m.Groups[0].Value);
 						break;
 					case DataType.Firebird:
-						charPatten = @"(CHAR|CHAR2|CHARACTER|TEXT)\s*(\([^\)]*\))?";
+						charPattern = @"(CHAR|CHAR2|CHARACTER|TEXT)\s*(\([^\)]*\))?";
 						if (strlen < 0) colattr.DbType = $"BLOB SUB_TYPE 1{strNotNull}";
-						else colattr.DbType = Regex.Replace(colattr.DbType, charPatten, $"$1({strlen})");
+						else colattr.DbType = Regex.Replace(colattr.DbType, charPattern, m =>
+							replaceCounter++ == 0 ? $"{m.Groups[1].Value}({strlen})" : m.Groups[0].Value);
 						break;
 					case DataType.GBase:
 						if (strlen < 0) colattr.DbType = $"TEXT{strNotNull}";
-						else colattr.DbType = Regex.Replace(colattr.DbType, charPatten, $"$1({strlen})");
+						else colattr.DbType = Regex.Replace(colattr.DbType, charPattern, m =>
+							replaceCounter++ == 0 ? $"{m.Groups[1].Value}({strlen})" : m.Groups[0].Value);
 						break;
 				}
 			}
@@ -412,7 +445,7 @@ namespace FreeSql.Internal
 			if (colattr.MapType == typeof(byte[]) && colattr.StringLength != 0)
 			{
 				int strlen = colattr.StringLength;
-				var bytePatten = @"(VARBINARY|BINARY|BYTEA)\s*(\([^\)]*\))?";
+				var bytePattern = @"(VARBINARY|BINARY|BYTEA)\s*(\([^\)]*\))?";
 				var strNotNull = colattr.IsNullable == false ? " NOT NULL" : "";
 				switch (common._orm.Ado.DataType)
 				{
@@ -421,13 +454,13 @@ namespace FreeSql.Internal
 					case DataType.CustomMySql:
 						if (strlen == -2) colattr.DbType = $"LONGBLOB{strNotNull}";
 						else if (strlen < 0) colattr.DbType = $"BLOB{strNotNull}";
-						else colattr.DbType = Regex.Replace(colattr.DbType, bytePatten, $"$1({strlen})");
+						else colattr.DbType = Regex.Replace(colattr.DbType, bytePattern, $"$1({strlen})");
 						break;
 					case DataType.SqlServer:
 					case DataType.OdbcSqlServer:
 					case DataType.CustomSqlServer:
-						if (strlen < 0) colattr.DbType = Regex.Replace(colattr.DbType, bytePatten, $"$1(MAX)");
-						else colattr.DbType = Regex.Replace(colattr.DbType, bytePatten, $"$1({strlen})");
+						if (strlen < 0) colattr.DbType = Regex.Replace(colattr.DbType, bytePattern, $"$1(MAX)");
+						else colattr.DbType = Regex.Replace(colattr.DbType, bytePattern, $"$1({strlen})");
 						break;
 					case DataType.PostgreSQL:
 					case DataType.OdbcPostgreSQL:
@@ -453,7 +486,7 @@ namespace FreeSql.Internal
 						break;
 					case DataType.MsAccess:
 						if (strlen < 0) colattr.DbType = $"BLOB{strNotNull}";
-						else colattr.DbType = Regex.Replace(colattr.DbType, bytePatten, $"$1({strlen})");
+						else colattr.DbType = Regex.Replace(colattr.DbType, bytePattern, $"$1({strlen})");
 						break;
 					case DataType.Firebird:
 						colattr.DbType = $"BLOB{strNotNull}";
@@ -919,67 +952,39 @@ namespace FreeSql.Internal
                         if (pnv.Name.Length >= tbref.CsName.Length - 1)
                             midFlagStr = pnv.Name.Remove(pnv.Name.Length - tbref.CsName.Length - 1);
 
-                        #region 在 trytb 命名空间下查找中间类
-                        if (midType == null)
+                        void midTypeFind(TableInfo maintb, string findTypeName)
                         {
-                            midType = trytb.Type.IsNested ?
-                                trytb.Type.Assembly.GetType($"{trytb.Type.Namespace?.NotNullAndConcat(".")}{trytb.Type.DeclaringType.Name}+{trytb.CsName}{tbref.CsName}{midFlagStr}", false, true) : //SongTag
-                                trytb.Type.Assembly.GetType($"{trytb.Type.Namespace?.NotNullAndConcat(".")}{trytb.CsName}{tbref.CsName}{midFlagStr}", false, true);
-                            valiManyToMany();
+                            if (midType == null)
+                            {
+                                midType = maintb.Type.IsNested ?
+                                    maintb.Type.Assembly.GetType($"{maintb.Type.Namespace?.NotNullAndConcat(".")}{maintb.Type.DeclaringType.Name}+{findTypeName}", false, true) : //Song.SongTag
+                                    maintb.Type.Assembly.GetType($"{maintb.Type.Namespace?.NotNullAndConcat(".")}{findTypeName}", false, true);
+                                valiManyToMany();
+                            }
                         }
-                        if (midType == null)
-                        {
-                            midType = trytb.Type.IsNested ?
-                                trytb.Type.Assembly.GetType($"{trytb.Type.Namespace?.NotNullAndConcat(".")}{trytb.Type.DeclaringType.Name}+{trytb.CsName}_{tbref.CsName}{(string.IsNullOrEmpty(midFlagStr) ? "" : "_")}{midFlagStr}", false, true) : //Song_Tag
-                                trytb.Type.Assembly.GetType($"{trytb.Type.Namespace?.NotNullAndConcat(".")}{trytb.CsName}_{tbref.CsName}{(string.IsNullOrEmpty(midFlagStr) ? "" : "_")}{midFlagStr}", false, true);
-                            valiManyToMany();
-                        }
-                        if (midType == null)
-                        {
-                            midType = trytb.Type.IsNested ?
-                                trytb.Type.Assembly.GetType($"{trytb.Type.Namespace?.NotNullAndConcat(".")}{trytb.Type.DeclaringType.Name}+{tbref.CsName}{trytb.CsName}{midFlagStr}", false, true) : //TagSong
-                                trytb.Type.Assembly.GetType($"{trytb.Type.Namespace?.NotNullAndConcat(".")}{tbref.CsName}{trytb.CsName}{midFlagStr}", false, true);
-                            valiManyToMany();
-                        }
-                        if (midType == null)
-                        {
-                            midType = trytb.Type.IsNested ?
-                                trytb.Type.Assembly.GetType($"{trytb.Type.Namespace?.NotNullAndConcat(".")}{trytb.Type.DeclaringType.Name}+{tbref.CsName}_{trytb.CsName}{(string.IsNullOrEmpty(midFlagStr) ? "" : "_")}{midFlagStr}", false, true) : //Tag_Song
-                                trytb.Type.Assembly.GetType($"{trytb.Type.Namespace?.NotNullAndConcat(".")}{tbref.CsName}_{trytb.CsName}{(string.IsNullOrEmpty(midFlagStr) ? "" : "_")}{midFlagStr}", false, true);
-                            valiManyToMany();
-                        }
-                        #endregion
+                        midTypeFind(trytb, $"{trytb.CsName}{tbref.CsName}{midFlagStr}"); //SongTag
+                        midTypeFind(trytb, $"{trytb.CsName}_{tbref.CsName}{(string.IsNullOrEmpty(midFlagStr) ? "" : "_")}{midFlagStr}"); //Song_Tag
+                        midTypeFind(trytb, $"{tbref.CsName}{trytb.CsName}{midFlagStr}"); //TagSong
+                        midTypeFind(trytb, $"{tbref.CsName}_{trytb.CsName}{(string.IsNullOrEmpty(midFlagStr) ? "" : "_")}{midFlagStr}"); //Tag_Song
 
-                        #region 在 tbref 命名空间下查找中间类
-                        if (midType == null)
+                        if (trytb.Type.Namespace != tbref.Type.Name)
                         {
-                            midType = tbref.Type.IsNested ?
-                                tbref.Type.Assembly.GetType($"{tbref.Type.Namespace?.NotNullAndConcat(".")}{tbref.Type.DeclaringType.Name}+{trytb.CsName}{tbref.CsName}{midFlagStr}", false, true) : //SongTag
-                                tbref.Type.Assembly.GetType($"{tbref.Type.Namespace?.NotNullAndConcat(".")}{trytb.CsName}{tbref.CsName}{midFlagStr}", false, true);
-                            valiManyToMany();
+                            midTypeFind(tbref, $"{trytb.CsName}{tbref.CsName}{midFlagStr}"); //SongTag
+                            midTypeFind(tbref, $"{trytb.CsName}_{tbref.CsName}{(string.IsNullOrEmpty(midFlagStr) ? "" : "_")}{midFlagStr}"); //Song_Tag
+                            midTypeFind(tbref, $"{tbref.CsName}{trytb.CsName}{midFlagStr}"); //TagSong
+                            midTypeFind(tbref, $"{tbref.CsName}_{trytb.CsName}{(string.IsNullOrEmpty(midFlagStr) ? "" : "_")}{midFlagStr}"); //Tag_Song
                         }
-                        if (midType == null)
-                        {
-                            midType = tbref.Type.IsNested ?
-                                tbref.Type.Assembly.GetType($"{tbref.Type.Namespace?.NotNullAndConcat(".")}{tbref.Type.DeclaringType.Name}+{trytb.CsName}_{tbref.CsName}{(string.IsNullOrEmpty(midFlagStr) ? "" : "_")}{midFlagStr}", false, true) : //Song_Tag
-                                tbref.Type.Assembly.GetType($"{tbref.Type.Namespace?.NotNullAndConcat(".")}{trytb.CsName}_{tbref.CsName}{(string.IsNullOrEmpty(midFlagStr) ? "" : "_")}{midFlagStr}", false, true);
-                            valiManyToMany();
-                        }
-                        if (midType == null)
-                        {
-                            midType = tbref.Type.IsNested ?
-                                tbref.Type.Assembly.GetType($"{tbref.Type.Namespace?.NotNullAndConcat(".")}{tbref.Type.DeclaringType.Name}+{tbref.CsName}{trytb.CsName}{midFlagStr}", false, true) : //TagSong
-                                tbref.Type.Assembly.GetType($"{tbref.Type.Namespace?.NotNullAndConcat(".")}{tbref.CsName}{trytb.CsName}{midFlagStr}", false, true);
-                            valiManyToMany();
-                        }
-                        if (midType == null)
-                        {
-                            midType = tbref.Type.IsNested ?
-                                tbref.Type.Assembly.GetType($"{tbref.Type.Namespace?.NotNullAndConcat(".")}{tbref.Type.DeclaringType.Name}+{tbref.CsName}_{trytb.CsName}{(string.IsNullOrEmpty(midFlagStr) ? "" : "_")}{midFlagStr}", false, true) : //Tag_Song
-                                tbref.Type.Assembly.GetType($"{tbref.Type.Namespace?.NotNullAndConcat(".")}{tbref.CsName}_{trytb.CsName}{(string.IsNullOrEmpty(midFlagStr) ? "" : "_")}{midFlagStr}", false, true);
-                            valiManyToMany();
-                        }
-                        #endregion
+
+                        //嵌套子类中查找
+                        midTypeFind(trytb, $"{trytb.CsName}+{trytb.CsName}{tbref.CsName}{midFlagStr}"); //Song.SongTag
+                        midTypeFind(trytb, $"{trytb.CsName}+{trytb.CsName}_{tbref.CsName}{(string.IsNullOrEmpty(midFlagStr) ? "" : "_")}{midFlagStr}"); //Song.Song_Tag
+                        midTypeFind(trytb, $"{trytb.CsName}+{tbref.CsName}{trytb.CsName}{midFlagStr}"); //Song.TagSong
+                        midTypeFind(trytb, $"{trytb.CsName}+{tbref.CsName}_{trytb.CsName}{(string.IsNullOrEmpty(midFlagStr) ? "" : "_")}{midFlagStr}"); //Song.Tag_Song
+
+                        midTypeFind(tbref, $"{tbref.CsName}+{trytb.CsName}{tbref.CsName}{midFlagStr}"); //Tag.SongTag
+                        midTypeFind(tbref, $"{tbref.CsName}+{trytb.CsName}_{tbref.CsName}{(string.IsNullOrEmpty(midFlagStr) ? "" : "_")}{midFlagStr}"); //Tag.Song_Tag
+                        midTypeFind(tbref, $"{tbref.CsName}+{tbref.CsName}{trytb.CsName}{midFlagStr}"); //Tag.TagSong
+                        midTypeFind(tbref, $"{tbref.CsName}+{tbref.CsName}_{trytb.CsName}{(string.IsNullOrEmpty(midFlagStr) ? "" : "_")}{midFlagStr}"); //Tag.Tag_Song
                     }
 
                     isManyToMany = midType != null;
@@ -2504,7 +2509,7 @@ namespace FreeSql.Internal
                         );
                         break;
                     default:
-                        if (type.IsEnum)
+                        if (type.IsEnum && TypeHandlers.ContainsKey(type) == false)
                             return Expression.Block(
                                 Expression.IfThenElse(
                                     Expression.Equal(Expression.TypeAs(valueExp, typeof(string)), Expression.Constant(string.Empty)),

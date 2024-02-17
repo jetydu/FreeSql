@@ -1,4 +1,5 @@
-﻿using FreeSql.Internal.Model;
+﻿using FreeSql.DataAnnotations;
+using FreeSql.Internal.Model;
 using System;
 using System.Collections;
 using System.Collections.Concurrent;
@@ -49,7 +50,8 @@ namespace FreeSql.Internal.CommonProvider
         public BaseDiyMemberExpression _diymemexpWithTempQuery;
         public Func<DbTransaction> _resolveHookTransaction;
 
-        public bool IsDefaultSqlContent => _distinct == false && _is_AsTreeCte == false && _tables.Count == 1 && _where.Length == 0 && _join.Length == 0 &&
+        public bool IsDefaultSqlContent => _tables.Count == 1 && _tables[0].Table?.AsTableImpl == null &&
+            _distinct == false && _is_AsTreeCte == false && _where.Length == 0 && _join.Length == 0 &&
             string.IsNullOrWhiteSpace(_orderby) && string.IsNullOrWhiteSpace(_groupby) && string.IsNullOrWhiteSpace(_tosqlAppendContent) &&
             _aliasRule == null && _selectExpression == null;
 
@@ -281,6 +283,8 @@ namespace FreeSql.Internal.CommonProvider
             }
         }
 
+        public static MethodInfo _methodSqlExtInternalRawField = typeof(SqlExt).GetMethod("InternalRawField", BindingFlags.NonPublic | BindingFlags.Static);
+        public static MethodInfo _methodSqlExtInternalRawSql = typeof(SqlExt).GetMethod("InternalRawSql", BindingFlags.NonPublic | BindingFlags.Static);
         public Expression ConvertStringPropertyToExpression(string property, bool fromFirstTable = false)
         {
             if (string.IsNullOrEmpty(property)) return null;
@@ -289,6 +293,15 @@ namespace FreeSql.Internal.CommonProvider
 
             if (field.Length == 1 && fromFirstTable == false)
             {
+                if (_tables.Count == 1 && _tables[0].Table?.Type == typeof(object))
+                {
+                    //配合 .Select<object>().WithSql("...").WhereDynamicFilter(...)
+                    var tb = _tables[0];
+                    tb.Parameter = Expression.Parameter(tb.Table.Type, tb.Alias);
+                    var rawField = $"{tb.Alias}.{_commonUtils.QuoteSqlName(field[0])}";
+                    return Expression.Call(_methodSqlExtInternalRawField, Expression.Constant(rawField, typeof(string)));
+                }
+
                 foreach (var tb in _tables)
                 {
                     if (tb.Table.ColumnsByCs.TryGetValue(field[0], out var col) &&
@@ -365,7 +378,7 @@ namespace FreeSql.Internal.CommonProvider
             {
                 var last = _SameSelectPendingShareData.Last();
                 if (last == null && _SameSelectPendingShareData.Count > 1) last = _SameSelectPendingShareData[_SameSelectPendingShareData.Count - 2];
-                if (last != null) 
+                if (last != null)
                     _params.AddRange(last.Item2 ?? new DbParameter[0]);
             }
             return this;
@@ -857,25 +870,36 @@ namespace FreeSql.Internal.CommonProvider
             var unions = new List<Dictionary<Type, string>>();
             var trs = _tableRules.Any() ? _tableRules : new List<Func<Type, string, string>>(new[] { new Func<Type, string, string>((type, oldname) => null) });
 
-            if (trs.Count == 1 && _tables.Any(a => a.Table != null && a.Table.AsTableImpl != null && string.IsNullOrWhiteSpace(trs[0](a.Table.Type, a.Table.DbName)) == true))
+            if (trs.Count == 1 && _tables.Any(a => a.Table != null && a.Table.AsTableImpl != null &&
+                string.IsNullOrWhiteSpace(trs[0](a.Table.Type, a.Table.AsTableImpl != null ? null : a.Table.DbName)) == true))
             {
+                DateTime? DateTimeAsTableImplStart = null, DateTimeAsTableImplEnd = null;
                 string[] LocalGetTableNames(SelectTableInfo tb)
                 {
-                    var trname = trs[0](tb.Table.Type, tb.Table.DbName);
+                    var trname = trs[0](tb.Table.Type, tb.Table.AsTableImpl != null ? null : tb.Table.DbName);
                     if (tb.Table.AsTableImpl != null && string.IsNullOrWhiteSpace(trname) == true)
                     {
-                        string[] aret = null;
-                        if (_where.Length == 0) aret = tb.Table.AsTableImpl.AllTables;
-                        else aret = tb.Table.AsTableImpl.GetTableNamesBySqlWhere(_where.ToString(), _params, tb, _commonUtils);
-                        if (aret.Any() == false) aret = tb.Table.AsTableImpl.AllTables.Take(1).ToArray();
-
-                        for (var a = 0; a < aret.Length; a++)
+                        var aret = tb.Table.AsTableImpl.GetTableNamesBySqlWhere(_where.Length == 0 ? null : _where.ToString(), _params, tb, _commonUtils);
+                        if (aret.Names.Any() == false)
                         {
-                            if (_orm.CodeFirst.IsSyncStructureToLower) aret[a] = aret[a].ToLower();
-                            if (_orm.CodeFirst.IsSyncStructureToUpper) aret[a] = aret[a].ToUpper();
-                            if (_orm.CodeFirst.IsAutoSyncStructure) _orm.CodeFirst.SyncStructure(tb.Table.Type, aret[a]);
+                            var now = DateTime.Now;
+                            aret = new IAsTableTableNameRangeResult(tb.Table.AsTableImpl.AllTables.Take(1).ToArray(), now, now);
                         }
-                        return aret;
+
+                        for (var a = 0; a < aret.Names.Length; a++)
+                        {
+                            if (_orm.CodeFirst.IsSyncStructureToLower) aret.Names[a] = aret.Names[a].ToLower();
+                            if (_orm.CodeFirst.IsSyncStructureToUpper) aret.Names[a] = aret.Names[a].ToUpper();
+                            if (_orm.CodeFirst.IsAutoSyncStructure) _orm.CodeFirst.SyncStructure(tb.Table.Type, aret.Names[a]);
+                        }
+                        if (tb.Table.AsTableImpl is DateTimeAsTableImpl)
+                        {
+                            if (aret.ColumnValue1 is DateTime dt1)
+                                if (DateTimeAsTableImplStart == null || dt1 > DateTimeAsTableImplStart) DateTimeAsTableImplStart = dt1;
+                            if (aret.ColumnValue2 is DateTime dt2)
+                                if (DateTimeAsTableImplEnd == null || dt2 < DateTimeAsTableImplEnd) DateTimeAsTableImplEnd = dt2;
+                        }
+                        return aret.Names;
                     }
                     if (string.IsNullOrWhiteSpace(trname) == false)
                     {
@@ -891,7 +915,11 @@ namespace FreeSql.Internal.CommonProvider
                     }
                     return new string[] { tb.Table.DbName };
                 }
-                var tbnames = _tables.GroupBy(a => a.Table.Type).Select(g => _tables.Where(a => a.Table.Type == g.Key).FirstOrDefault()).Select(a => new { Tb = a, Names = LocalGetTableNames(a) }).ToList();
+                var tbnames = _tables.Where(a => a.Type != SelectTableInfoType.Parent).GroupBy(a => a.Table.Type).Select(g => _tables.Where(a => a.Table.Type == g.Key).FirstOrDefault()).Select(a => new { Tb = a, Names = LocalGetTableNames(a) }).ToList();
+                if (DateTimeAsTableImplStart != null && DateTimeAsTableImplEnd != null && tbnames.Where(a => a.Names.Length > 1).Count() > 1)
+                {
+                    tbnames = tbnames.Select(a => new { a.Tb, Names = a.Tb.Table.AsTableImpl?.GetTableNamesByColumnValueRange(DateTimeAsTableImplStart, DateTimeAsTableImplEnd) ?? a.Names }).ToList();
+                }
                 var dict = new Dictionary<Type, string>();
                 tbnames.ForEach(a =>
                 {
@@ -911,6 +939,30 @@ namespace FreeSql.Internal.CommonProvider
                                 dict.Add(uit.Key, uit.Key == tbnames[a].Tb.Table.Type ? tbnames[a].Names[b] : uit.Value);
                             unions.Add(dict);
                         }
+                    }
+                }
+                if (DateTimeAsTableImplStart != null && DateTimeAsTableImplEnd != null && tbnames.Where(a => a.Names.Length > 1).Count() > 1)
+                {
+                    for (var uidx = unions.Count - 1; uidx >= 0; uidx--)
+                    {
+                        var ignore = false;
+                        DateTime? dtStart = null, dtEnd = null;
+                        foreach (var ut in unions[uidx])
+                        {
+                            if (tbnames.Where(a => a.Tb.Table.Type == ut.Key).FirstOrDefault()?.Tb.Table?.AsTableImpl is DateTimeAsTableImpl dtImpl == false) continue;
+                            var dtRange = dtImpl.GetRangeByTableName(ut.Value);
+                            if (dtRange == null) continue;
+                            if (dtStart == null) dtStart = dtRange.Item1;
+                            if (dtEnd == null) dtEnd = dtRange.Item2;
+                            if (dtRange.Item1 >= dtEnd || dtRange.Item2 <= dtStart)
+                            {
+                                ignore = true;
+                                break;
+                            }
+                            if (dtRange.Item1 > dtStart) dtStart = dtRange.Item1;
+                            if (dtRange.Item2 < dtEnd) dtEnd = dtRange.Item2;
+                        }
+                        if (ignore) unions.RemoveAt(uidx);
                     }
                 }
                 return unions;
@@ -1026,10 +1078,10 @@ namespace FreeSql.Internal.CommonProvider
                             if (fiValue0Method == null) throw new ArgumentException(CoreStrings.NotFound_Static_MethodName(fiValueCustomArray[0]));
                             if (MethodIsDynamicFilterCustomAttribute(fiValue0Method) == false) throw new ArgumentException(CoreStrings.Custom_StaticMethodName_NotSet_DynamicFilterCustom(fiValueCustomArray[0]));
                             var fiValue0MethodReturn = fiValue0Method?.Invoke(null, fiValue0Method.GetParameters()
-                                    .Select(a => a.ParameterType == typeof(object) ? (object)this : 
+                                    .Select(a => a.ParameterType == typeof(object) ? (object)this :
                                         (a.ParameterType == typeof(string) ? (object)(fi.Value?.ToString()) : (object)null))
                                     .ToArray());
-                            exp = fiValue0MethodReturn is Expression expression ? expression : Expression.Call(typeof(SqlExt).GetMethod("InternalRawSql", BindingFlags.NonPublic | BindingFlags.Static), Expression.Constant(fiValue0MethodReturn?.ToString(), typeof(string)));
+                            exp = fiValue0MethodReturn is Expression expression ? expression : Expression.Call(_methodSqlExtInternalRawSql, Expression.Constant(fiValue0MethodReturn?.ToString(), typeof(string)));
                             break;
 
                         case DynamicFilterOperator.Contains:
@@ -1043,6 +1095,16 @@ namespace FreeSql.Internal.CommonProvider
                             break;
                         default:
                             exp = ConvertStringPropertyToExpression(fi.Field);
+                            if (exp.Type == typeof(object) && fi.Value != null)
+                            {
+                                var valueType = fi.Value?.GetType();
+                                if (Utils.dicExecuteArrayRowReadClassOrTuple.ContainsKey(valueType)) exp = Expression.Convert(exp, valueType);
+                                else if (valueType.FullName == "System.Text.Json.JsonElement")
+                                {
+                                    var valueKind = valueType.GetProperty("ValueKind").GetValue(fi.Value, null).ToString();
+                                    if (valueKind == "Number") exp = Expression.Convert(exp, typeof(decimal));
+                                }
+                            }
                             break;
                     }
                     switch (fi.Operator)

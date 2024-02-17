@@ -6,8 +6,10 @@ using System.Collections.Generic;
 using System.Data.Common;
 using System.Globalization;
 using System.Data;
+using System.Text.Json;
 using ClickHouse.Client.ADO.Parameters;
 using System.Text.RegularExpressions;
+using System.Text;
 
 namespace FreeSql.ClickHouse
 {
@@ -18,7 +20,7 @@ namespace FreeSql.ClickHouse
         }
 
         public override DbParameter AppendParamter(List<DbParameter> _params, string parameterName, ColumnInfo col, Type type, object value)
-        {
+         {
             if (value is string str)
                 value = str?.Replace("\t", "\\t")
                     .Replace("\r\n", "\\r\\n")
@@ -43,8 +45,10 @@ namespace FreeSql.ClickHouse
                         if (col.DbScale != 0) ret.Scale = col.DbScale;
                         break;
                 }
-                if (value is bool)
-                    ret.Value = (bool)value ? 1 : 0;
+                //if (value.GetType().IsArray)
+                //{
+                //     ret.DbType = DbType.Object;
+                //}
             }
             _params?.Add(ret);
             return ret;
@@ -68,13 +72,13 @@ namespace FreeSql.ClickHouse
 
         public override string RewriteColumn(ColumnInfo col, string sql)
         {
+            if (string.IsNullOrWhiteSpace(col?.Attribute?.DbType)) return sql;
             col.Attribute.DbType = col.Attribute.DbType.Replace(" NOT NULL", "");
             if (string.IsNullOrWhiteSpace(col?.Attribute.RewriteSql) == false)
                 return string.Format(col.Attribute.RewriteSql, sql);
             if (Regex.IsMatch(sql, @"\{\{[\w\d]+_+\d:\{\d\}\}\}"))
                 return string.Format(sql, col.Attribute.DbType);
-            else
-                return sql;
+            return sql;
         }
 
         public override string FormatSql(string sql, params object[] args) => sql?.FormatClickHouse(args);
@@ -145,7 +149,7 @@ namespace FreeSql.ClickHouse
         }
 
         public override string GetNoneParamaterSqlValue(List<DbParameter> specialParams, string specialParamFlag, ColumnInfo col, Type type, object value)
-        {
+         {
             if (value == null) return "NULL";
             if (type.IsNumberType()) return string.Format(CultureInfo.InvariantCulture, "{0}", value);
             if (type == typeof(byte[])) return $"0x{CommonUtils.BytesSqlRaw(value as byte[])}";
@@ -154,7 +158,22 @@ namespace FreeSql.ClickHouse
                 var ts = (TimeSpan)value;
                 value = $"{Math.Floor(ts.TotalHours)}:{ts.Minutes}:{ts.Seconds}";
             }
-            return FormatSql("{0}", value, 1);
+			else if (value is Array)
+			{
+				var valueArr = value as Array;
+				var eleType = type.GetElementType();
+				var len = valueArr.GetLength(0);
+				var sb = new StringBuilder().Append("[");
+				for (var a = 0; a < len; a++)
+				{
+					var item = valueArr.GetValue(a);
+					if (a > 0) sb.Append(",");
+					sb.Append(GetNoneParamaterSqlValue(specialParams, specialParamFlag, col, eleType, item));
+				}
+				sb.Append("]");
+				return sb.ToString();
+			}
+			return FormatSql("{0}", value, 1);
         }
     }
 }
