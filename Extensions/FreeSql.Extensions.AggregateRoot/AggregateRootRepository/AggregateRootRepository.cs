@@ -56,6 +56,7 @@ namespace FreeSql
                 _repository.DbContextOptions.EnableCascadeSave = false;
             }
         }
+        public RepositoryDataFilter DataFilter => _repository.DataFilter;
         public void AsType(Type entityType) => _repository.AsType(entityType); 
         Func<Type, string, string> _asTableRule;
         public void AsTable(Func<string, string> rule)
@@ -74,7 +75,6 @@ namespace FreeSql
 			_asTableRule = rule;
 		}
 		public Type EntityType => _repository.EntityType;
-        public IDataFilter<TEntity> DataFilter => _repository.DataFilter;
 
         public void Attach(TEntity entity)
         {
@@ -94,18 +94,17 @@ namespace FreeSql
         {
             if (newdata == null) return null;
             var _table = Orm.CodeFirst.GetTableByEntity(EntityType);
-            if (_table.Primarys.Any() == false) throw new Exception(DbContextStrings.Incomparable_EntityHasNo_PrimaryKey(Orm.GetEntityString(EntityType, newdata)));
+            if (_table.Primarys.Any() == false) throw new Exception(DbContextErrorStrings.Incomparable_EntityHasNo_PrimaryKey(Orm.GetEntityString(EntityType, newdata)));
             var key = Orm.GetEntityKeyString(EntityType, newdata, false);
-            if (string.IsNullOrEmpty(key)) throw new Exception(DbContextStrings.Incomparable_PrimaryKey_NotSet(Orm.GetEntityString(EntityType, newdata)));
+            if (string.IsNullOrEmpty(key)) throw new Exception(DbContextErrorStrings.Incomparable_PrimaryKey_NotSet(Orm.GetEntityString(EntityType, newdata)));
             if (_states.TryGetValue(key, out var oldState) == false || oldState == null) throw new Exception($"不可对比，数据未被跟踪：{Orm.GetEntityString(EntityType, newdata)}");
             AggregateRootTrackingChangeInfo tracking = new AggregateRootTrackingChangeInfo();
-            AggregateRootUtils.CompareEntityValue(_boundaryName, Orm, EntityType, oldState, newdata, null, tracking);
-            return new Dictionary<string, object[]>
-            {
-                ["Insert"] = tracking.InsertLog.Select(a => new object[] { a.Item1, a.Item2 }).ToArray(),
-                ["Delete"] = tracking.DeleteLog.Select(a => new object[] { a.Item1, a.Item2 }).ToArray(),
-                ["Update"] = tracking.UpdateLog.Select(a => new object[] { a.Item1, a.Item2, a.Item3, a.Item4 }).ToArray(),
-            };
+            AggregateRootUtils.CompareEntityValue(_boundaryName, Orm, EntityType, oldState.Value, newdata, null, tracking);
+            var result = new Dictionary<string, object[]>();
+            if (tracking.InsertLog.Any()) result.Add("Insert", tracking.InsertLog.Select(a => new object[] { a.Item1, a.Item2 }).ToArray());
+            if (tracking.DeleteLog.Any()) result.Add("Delete", tracking.DeleteLog.Select(a => new object[] { a.Item1, a.Item2 }).ToArray());
+            if (tracking.UpdateLog.Any()) result.Add("Update", tracking.UpdateLog.Select(a => new object[] { a.Item1, a.Item2, a.Item3, a.Item4 }).ToArray());
+            return result;
         }
         public void FlushState()
         {
@@ -131,6 +130,7 @@ namespace FreeSql
             repo.UnitOfWork = UnitOfWork;
             repo.DbContextOptions = DbContextOptions;
             repo.DbContextOptions.EnableCascadeSave = false;
+            (repo as BaseRepository<object>).DataFilter = DataFilter;
             repo.AsTable(_asTableRule);
             return repo;
         }

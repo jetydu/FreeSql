@@ -93,8 +93,8 @@ namespace FreeSql.Odbc.Oracle
             {
                 if (sb.Length > 0) sb.Append("\r\n");
                 var tb = obj.tableSchema;
-                if (tb == null) throw new Exception(CoreStrings.S_Type_IsNot_Migrable(obj.tableSchema.Type.FullName));
-                if (tb.Columns.Any() == false) throw new Exception(CoreStrings.S_Type_IsNot_Migrable_0Attributes(obj.tableSchema.Type.FullName));
+                if (tb == null) throw new Exception(CoreErrorStrings.S_Type_IsNot_Migrable(obj.tableSchema.Type.FullName));
+                if (tb.Columns.Any() == false) throw new Exception(CoreErrorStrings.S_Type_IsNot_Migrable_0Attributes(obj.tableSchema.Type.FullName));
                 var tbname = _commonUtils.SplitTableName(tb.DbName);
                 if (tbname?.Length == 1) tbname = new[] { userId, tbname[0] };
 
@@ -115,7 +115,7 @@ namespace FreeSql.Odbc.Oracle
                 //codefirst 不支持表名中带 .
 
                 if (string.Compare(tbname[0], userId) != 0 && _orm.Ado.ExecuteScalar(CommandType.Text, _commonUtils.FormatSql(" select 1 from sys.dba_users where username={0}", tbname[0])) == null) //创建数据库
-                    throw new NotImplementedException(CoreStrings.S_Oracle_NotSupport_TablespaceSchemas(tbname[0]));
+                    throw new NotImplementedException(CoreErrorStrings.S_Oracle_NotSupport_TablespaceSchemas(tbname[0]));
 
                 var sbalter = new StringBuilder();
                 var istmpatler = false; //创建临时表，导入数据，删除旧表，修改
@@ -314,7 +314,8 @@ and not exists(select 1 from all_constraints where constraint_name = a.index_nam
                     sb.Append("execute immediate 'ALTER TABLE ").Append(_commonUtils.QuoteSqlName($"{tbname[0]}.{tbname[1]}")).Append(" DROP CONSTRAINT ").Append(_commonUtils.QuoteSqlName(oldpk)).Append("';\r\n");
 
                 //创建临时表，数据导进临时表，然后删除原表，将临时表改名为原表名
-                var tablename = tboldname == null ? _commonUtils.QuoteSqlName($"{tbname[0]}.{tbname[1]}") : _commonUtils.QuoteSqlName($"{tboldname[0]}.{tboldname[1]}");
+                var newtablename = _commonUtils.QuoteSqlName($"{tbname[0]}.{tbname[1]}");
+                var tablename = tboldname == null ? newtablename : _commonUtils.QuoteSqlName($"{tboldname[0]}.{tboldname[1]}");
                 var tmptablename = _commonUtils.QuoteSqlName($"{tbname[0]}.FTmp_{tbname[1]}");
                 //创建临时表
                 sb.Append("execute immediate 'CREATE TABLE ").Append(tmptablename).Append(" ( ");
@@ -354,8 +355,9 @@ and not exists(select 1 from all_constraints where constraint_name = a.index_nam
                         insertvalue = _commonUtils.QuoteSqlName(tbstructcol.column);
                         if (tbcol.Attribute.DbType.StartsWith(tbstructcol.sqlType, StringComparison.CurrentCultureIgnoreCase) == false)
                         {
-                            var dbtypeNoneNotNull = Regex.Replace(tbcol.Attribute.DbType, @"(NOT\s+)?NULL", "");
-                            insertvalue = $"cast({insertvalue} as {dbtypeNoneNotNull})";
+                            var dbtypeNoneNotNull = Regex.Replace(tbcol.Attribute.DbType, @"(NOT\s+)?NULL", "").Trim();
+                            if (dbtypeNoneNotNull != "CLOB" && dbtypeNoneNotNull != "NCLOB" && dbtypeNoneNotNull != "BLOB")
+                                insertvalue = $"cast({insertvalue} as {dbtypeNoneNotNull})";
                         }
                         if (tbcol.Attribute.IsNullable != tbstructcol.is_nullable)
                             insertvalue = $"nvl({insertvalue},{tbcol.DbDefaultValue})";
@@ -372,7 +374,7 @@ and not exists(select 1 from all_constraints where constraint_name = a.index_nam
                 {
                     sb.Append("execute immediate 'CREATE ");
                     if (uk.IsUnique) sb.Append("UNIQUE ");
-                    sb.Append("INDEX ").Append(_commonUtils.QuoteSqlName(ReplaceIndexName(uk.Name, tbname[1]))).Append(" ON ").Append(tablename).Append("(");
+                    sb.Append("INDEX ").Append(_commonUtils.QuoteSqlName(ReplaceIndexName(uk.Name, tbname[1]))).Append(" ON ").Append(newtablename).Append("(");
                     foreach (var tbcol in uk.Columns)
                     {
                         sb.Append(_commonUtils.QuoteSqlName(tbcol.Column.Attribute.Name));

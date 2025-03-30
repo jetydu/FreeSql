@@ -25,7 +25,7 @@ namespace FreeSql.Custom.PostgreSQL
                 MasterPool = pool;
                 return;
             }
-            throw new Exception(CoreStrings.S_CustomAdapter_OnlySuppport_UseConnectionFactory);
+            throw new Exception(CoreErrorStrings.S_CustomAdapter_OnlySuppport_UseConnectionFactory);
         }
 
         public override object AddslashesProcessParam(object param, Type mapType, ColumnInfo mapColumn)
@@ -51,7 +51,10 @@ namespace FreeSql.Custom.PostgreSQL
                 return AddslashesTypeHandler(typeof(DateTime?), param) ?? string.Concat("'", ((DateTime)param).ToString("yyyy-MM-dd HH:mm:ss.ffffff"), "'");
 
             else if (param is TimeSpan || param is TimeSpan?)
-                return ((TimeSpan)param).Ticks / 10;
+            {
+                var ts = (TimeSpan)param;
+                return $"'{Math.Min(24, (int)Math.Floor(ts.TotalHours))}:{ts.Minutes}:{ts.Seconds}'";
+            }
             else if (param is byte[])
                 return $"'\\x{CommonUtils.BytesSqlRaw(param as byte[])}'";
             else if (param is IEnumerable)

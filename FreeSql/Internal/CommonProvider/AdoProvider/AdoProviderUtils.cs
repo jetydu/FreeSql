@@ -2,6 +2,7 @@
 using System;
 using System.Collections;
 using System.Collections.Concurrent;
+using System.Data;
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -50,15 +51,16 @@ namespace FreeSql.Internal.CommonProvider
                     sb.Append("   \r\n    \r\n"); //500元素分割, 3空格\r\n4空格
                     idx = 1;
                 }
-                sb.Append(AddslashesProcessParam(z, mapType, mapColumn));
+                sb.Append(string.Format(CultureInfo.InvariantCulture, "{0}", AddslashesProcessParam(z, mapType, mapColumn)));
             }
 
             return sb.Length == 0 ? "(NULL)" : sb.Remove(0, 1).Insert(0, "(").Append(")").ToString();
         }
 
-        public static bool IsFromSlave(string cmdText)
+        public static bool IsFromSlave(string cmdText, CommandType cmdType)
         {
-            return cmdText.StartsWith("SELECT ", StringComparison.CurrentCultureIgnoreCase) ||
+            return cmdType == CommandType.StoredProcedure ||
+                cmdText.StartsWith("SELECT ", StringComparison.CurrentCultureIgnoreCase) ||
                 cmdText.StartsWith("WITH ", StringComparison.CurrentCultureIgnoreCase);
         }
     }

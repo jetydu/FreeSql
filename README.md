@@ -20,7 +20,7 @@ FreeSql is a powerful O/RM component, supports .NET Core 2.1+, .NET Framework 4.
 - 🌲 Support expression functions, and customizable analysis.
 - 🏁 Support one-to-many and many-to-many navigation properties, include and lazy loading.
 - 📃 Support Read/Write separation, Splitting Table/Database, Global filters, Optimistic and pessimistic locker.
-- 🌳 Support MySql/SqlServer/PostgreSQL/Oracle/Sqlite/Firebird/达梦/人大金仓/南大通用/虚谷/神舟通用/翰高/ClickHouse/QuestDB/MsAccess, etc.
+- 🌳 Support MySql/SqlServer/PostgreSQL/Oracle/Sqlite/Firebird/达梦/人大金仓/南大通用/虚谷/神舟通用/翰高/ClickHouse/DuckDB/TDengine/QuestDB/MsAccess, etc.
 
 QQ Groups：**561616019(available)**、4336577(full)、8578575(full)、52508226(full)
 
@@ -30,14 +30,13 @@ QQ Groups：**561616019(available)**、4336577(full)、8578575(full)、52508226(
 | - |
 | [Get started](https://github.com/dotnetcore/FreeSql/wiki/Getting-Started)&nbsp;&nbsp;\|&nbsp;&nbsp;[Select](https://github.com/dotnetcore/FreeSql/wiki/Query-Data)&nbsp;&nbsp;\|&nbsp;&nbsp;[Update](https://github.com/dotnetcore/FreeSql/wiki/Update-Data)&nbsp;&nbsp;\|&nbsp;&nbsp;[Insert](https://github.com/dotnetcore/FreeSql/wiki/Insert-Data)&nbsp;&nbsp;\|&nbsp;&nbsp;[Delete](https://github.com/dotnetcore/FreeSql/wiki/Delete-Data)&nbsp;&nbsp;\|&nbsp;&nbsp;[FAQ](https://github.com/dotnetcore/FreeSql/wiki/%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98)&nbsp;&nbsp;|
 | [Expression](https://github.com/dotnetcore/FreeSql/wiki/%e8%a1%a8%e8%be%be%e5%bc%8f%e5%87%bd%e6%95%b0)&nbsp;&nbsp;\|&nbsp;&nbsp;[CodeFirst](https://github.com/dotnetcore/FreeSql/wiki/CodeFirst)&nbsp;&nbsp;\|&nbsp;&nbsp;[DbFirst](https://github.com/2881099/FreeSql/wiki/DbFirst)&nbsp;&nbsp;\|&nbsp;&nbsp;[Filters](https://github.com/dotnetcore/FreeSql/wiki/%e8%bf%87%e6%bb%a4%e5%99%a8)&nbsp;&nbsp;\|&nbsp;&nbsp;[AOP](https://github.com/2881099/FreeSql/wiki/AOP)&nbsp;&nbsp;|
-| [Repository](https://github.com/dotnetcore/FreeSql/wiki/Repository-layer)&nbsp;&nbsp;\|&nbsp;&nbsp;[UnitOfWork](https://github.com/dotnetcore/FreeSql/wiki/Unit-of-Work)&nbsp;&nbsp;\|&nbsp;&nbsp;[DbContext](https://github.com/dotnetcore/FreeSql/wiki/DbContext)&nbsp;&nbsp;\|&nbsp;&nbsp;[ADO](https://github.com/2881099/FreeSql/wiki/ADO)&nbsp;&nbsp;|
+| [Repository](https://github.com/dotnetcore/FreeSql/wiki/Repository-layer)&nbsp;&nbsp;\|&nbsp;&nbsp;[UnitOfWork](https://github.com/dotnetcore/FreeSql/wiki/Unit-of-Work)&nbsp;&nbsp;\|&nbsp;&nbsp;[Dynamic Operations](https://github.com/dotnetcore/FreeSql/wiki/%E5%8A%A8%E6%80%81%E6%93%8D%E4%BD%9C)&nbsp;&nbsp;\|&nbsp;&nbsp;[ADO](https://github.com/2881099/FreeSql/wiki/ADO)&nbsp;&nbsp;|
 | [Read/Write](https://github.com/dotnetcore/FreeSql/wiki/%e8%af%bb%e5%86%99%e5%88%86%e7%a6%bb)&nbsp;&nbsp;\|&nbsp;&nbsp;[Splitting Table](https://github.com/dotnetcore/FreeSql/wiki/%e5%88%86%e8%a1%a8%e5%88%86%e5%ba%93)&nbsp;&nbsp;\|&nbsp;&nbsp;[Hide tech](https://github.com/dotnetcore/FreeSql/wiki/%E9%AA%9A%E6%93%8D%E4%BD%9C)&nbsp;&nbsp;\|&nbsp;&nbsp;[*Update Notes*](https://github.com/dotnetcore/FreeSql/wiki/%e6%9b%b4%e6%96%b0%e6%97%a5%e5%bf%97)&nbsp;&nbsp;|
 
 > Please select a development mode:
 
 - Use FreeSql, keep the original usage.
-- Use [FreeSql.Repository](https://github.com/dotnetcore/FreeSql/wiki/Repository), Repository + UnitOfWork.
-- Use [FreeSql.DbContext](https://github.com/dotnetcore/FreeSql/wiki/DbContext), Like efcore.
+- Use [FreeSql.DbContext](https://github.com/dotnetcore/FreeSql/wiki/Repository), Repository + UnitOfWork.
 - Use [FreeSql.BaseEntity](https://github.com/dotnetcore/FreeSql/tree/master/Examples/base_entity), Simple mode.
 
 > Some open source projects that use FreeSql:
@@ -45,6 +44,7 @@ QQ Groups：**561616019(available)**、4336577(full)、8578575(full)、52508226(
 - [Zhontai.net Management System](https://github.com/zhontai/Admin.Core)
 - [A simple CMS implemented by .NET8](https://github.com/luoyunchong/lin-cms-dotnetcore)
 - [AIBPM workflow](https://github.com/leooneone/aibpm.plus)
+- [NetAdmin A rapid development framework based on C#12/.NET9 and FreeSql](https://github.com/nsnail/NetAdmin)
 
 <p align="center">
   <img src="https://github.com/dotnetcore/FreeSql/raw/master/functions13.png"/>
@@ -217,7 +217,7 @@ homejun,
 
 ## 💕 Donation
 
-L*y 58元、花花 88元、麦兜很乖 50元、网络来者 2000元、John 99.99元、alex 666元、bacongao 36元、无名 100元、Eternity 188元、无名 10元、⌒.Helper~..oO 66元、习惯与被习惯 100元、无名 100元、蔡易喋 88.88元、中讯科技 1000元、Good Good Work 24元、炽焰 6.6元、Nothing 100元、兰州天擎赵 500元、哈利路亚 300元、
+L*y 58元、花花 88元、麦兜很乖 50元、网络来者 2000元、John 99.99元、alex 666元、bacongao 36元、无名 100元、Eternity 188元、无名 10元、⌒.Helper~..oO 66元、习惯与被习惯 100元、无名 100元、蔡易喋 88.88元、中讯科技 1000元、Good Good Work 24元、Nothing 100元、兰州天擎赵 500元、哈利路亚 300元、
 无名 100元、蛰伏 99.99元、TCYM 66.66元、MOTA 5元、LDZXG 30元、Near 30元、建爽 66元、无名 200元、LambertWu 100元、无名 18.88元、乌龙 50元、无名 100元、陳怼怼 66.66元、陳怼怼 66.66元、丁淮 100元、李伟坚-Excel催化剂 100元、白狐 6.66元、她微笑的脸y 30元、Eternity²º²¹ 588元、夜归柴门 88元、蔡易喋 666.66元、
 *礼 10元、litrpa 88元、Alax CHOW 200元、Daily 66元、k\*t 66元、蓝 100元、*菜 10元、生命如歌 1000元、山鸡 88元、平凡 100元、大树 1000元、软软的毛毛虫 66.66元、问卷星 2000元、与你无关 5000元
 

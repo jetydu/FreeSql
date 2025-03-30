@@ -277,35 +277,6 @@ namespace FreeSql.Xugu
             }
             return null;
         }
-        public override string ExpressionLambdaToSqlMemberAccessTimeSpan(MemberExpression exp, ExpTSC tsc)
-        {
-            if (exp.Expression == null)
-            {
-                switch (exp.Member.Name)
-                {
-                    case "Zero": return "0";
-                    case "MinValue": return "-922337203685477580"; //微秒 Ticks / 10
-                    case "MaxValue": return "922337203685477580";
-                }
-                return null;
-            }
-            var left = ExpressionLambdaToSql(exp.Expression, tsc);
-            switch (exp.Member.Name)
-            {
-                case "Days": return $"floor(({left})/{60 * 60 * 24})";
-                case "Hours": return $"floor(({left})/{60 * 60}%24)";
-                case "Milliseconds": return $"(cast({left} as bigint)*1000)";
-                case "Minutes": return $"floor(({left})/60%60)";
-                case "Seconds": return $"(({left})%60)";
-                case "Ticks": return $"(cast({left} as bigint)*10000000)";
-                case "TotalDays": return $"(({left})/{60 * 60 * 24})";
-                case "TotalHours": return $"(({left})/{60 * 60})";
-                case "TotalMilliseconds": return $"(cast({left} as bigint)*1000)";
-                case "TotalMinutes": return $"(({left})/60)";
-                case "TotalSeconds": return $"({left})";
-            }
-            return null;
-        }
 
         public override string ExpressionLambdaToSqlCallString(MethodCallExpression exp, ExpTSC tsc)
         {
@@ -323,7 +294,7 @@ namespace FreeSql.Xugu
                     case "Concat":
                         return _common.StringConcat(exp.Arguments.Select(a => getExp(a)).ToArray(), null);
                     case "Format":
-                        if (exp.Arguments[0].NodeType != ExpressionType.Constant) throw new Exception(CoreStrings.Not_Implemented_Expression_ParameterUseConstant(exp,exp.Arguments[0]));
+                        if (exp.Arguments[0].NodeType != ExpressionType.Constant) throw new Exception(CoreErrorStrings.Not_Implemented_Expression_ParameterUseConstant(exp,exp.Arguments[0]));
                         var expArgsHack = exp.Arguments.Count == 2 && exp.Arguments[1].NodeType == ExpressionType.NewArrayInit ?
                             (exp.Arguments[1] as NewArrayExpression).Expressions : exp.Arguments.Where((a, z) => z > 0);
                         //3个 {} 时，Arguments 解析出来是分开的
@@ -359,13 +330,14 @@ namespace FreeSql.Xugu
                     case "StartsWith":
                     case "EndsWith":
                     case "Contains":
+                        var leftLike = exp.Object.NodeType == ExpressionType.MemberAccess ? left : $"({left})";
                         var args0Value = getExp(exp.Arguments[0]);
-                        if (args0Value == "NULL") return $"({left}) IS NULL";
+                        if (args0Value == "NULL") return $"{leftLike} IS NULL";
                         if (args0Value.Contains("%"))
                         {
-                            if (exp.Method.Name == "StartsWith") return $"strpos({args0Value}, {left}) = 1";
-                            if (exp.Method.Name == "EndsWith") return $"strpos({args0Value}, {left}) = char_length({args0Value})";
-                            return $"strpos({args0Value}, {left}) > 0";
+                            if (exp.Method.Name == "StartsWith") return $"strpos({left}, {args0Value}) = 1";
+                            if (exp.Method.Name == "EndsWith") return $"strpos({left}, {args0Value}) = char_length({left})-char_length({args0Value})+1";
+                            return $"strpos({left}, {args0Value}) > 0";
                         }
                         var likeOpt = "LIKE";
                         if (exp.Arguments.Count > 1)
@@ -373,10 +345,10 @@ namespace FreeSql.Xugu
                             if (exp.Arguments[1].Type == typeof(bool) ||
                                 exp.Arguments[1].Type == typeof(StringComparison)) likeOpt = "ILIKE";
                         }
-                        if (exp.Method.Name == "StartsWith") return $"({left}) {likeOpt} {(args0Value.EndsWith("'") ? args0Value.Insert(args0Value.Length - 1, "%") : $"(cast({args0Value} as varchar) || '%')")}";
-                        if (exp.Method.Name == "EndsWith") return $"({left}) {likeOpt} {(args0Value.StartsWith("'") ? args0Value.Insert(1, "%") : $"('%' || cast({args0Value} as varchar))")}";
-                        if (args0Value.StartsWith("'") && args0Value.EndsWith("'")) return $"({left}) {likeOpt} {args0Value.Insert(1, "%").Insert(args0Value.Length, "%")}";
-                        return $"({left}) {likeOpt} ('%' || cast({args0Value} as varchar) || '%')";
+                        if (exp.Method.Name == "StartsWith") return $"{leftLike} {likeOpt} {(args0Value.EndsWith("'") ? args0Value.Insert(args0Value.Length - 1, "%") : $"(cast({args0Value} as varchar) || '%')")}";
+                        if (exp.Method.Name == "EndsWith") return $"{leftLike} {likeOpt} {(args0Value.StartsWith("'") ? args0Value.Insert(1, "%") : $"('%' || cast({args0Value} as varchar))")}";
+                        if (args0Value.StartsWith("'") && args0Value.EndsWith("'")) return $"{leftLike} {likeOpt} {args0Value.Insert(1, "%").Insert(args0Value.Length, "%")}";
+                        return $"{leftLike} {likeOpt} ('%' || cast({args0Value} as varchar) || '%')";
                     case "ToLower": return $"lower({left})";
                     case "ToUpper": return $"upper({left})";
                     case "Substring":
@@ -457,6 +429,19 @@ namespace FreeSql.Xugu
             }
             return null;
         }
+        public override string ExpressionLambdaToSqlCallDateDiff(string memberName, Expression date1, Expression date2, ExpTSC tsc)
+        {
+            Func<Expression, string> getExp = exparg => ExpressionLambdaToSql(exparg, tsc);
+            switch (memberName)
+            {
+                case "TotalDays": return $"datediff(day,{getExp(date2)},{getExp(date1)})";
+                case "TotalHours": return $"datediff(hour,{getExp(date2)},{getExp(date1)})";
+                case "TotalMilliseconds": return $"datediff(millisecond,{getExp(date2)},{getExp(date1)})";
+                case "TotalMinutes": return $"datediff(minute,{getExp(date2)},{getExp(date1)})";
+                case "TotalSeconds": return $"datediff(second,{getExp(date2)},{getExp(date1)})";
+            }
+            return null;
+        }
         public override string ExpressionLambdaToSqlCallDateTime(MethodCallExpression exp, ExpTSC tsc)
         {
             Func<Expression, string> getExp = exparg => ExpressionLambdaToSql(exparg, tsc);
@@ -484,7 +469,6 @@ namespace FreeSql.Xugu
                 var args1 = exp.Arguments.Count == 0 ? null : getExp(exp.Arguments[0]);
                 switch (exp.Method.Name)
                 {
-                    case "Add": return $"date_add({left}, interval '{args1}' microsecond)";
                     case "AddDays": return $"date_add({left}, interval '{args1}' day)";
                     case "AddHours": return $"date_add({left}, interval '{args1}' hour)";
                     case "AddMilliseconds": return $"date_add({left}, interval '{args1}'*1000 microsecond)";
@@ -496,8 +480,7 @@ namespace FreeSql.Xugu
                     case "Subtract":
                         switch ((exp.Arguments[0].Type.IsNullableType() ? exp.Arguments[0].Type.GetGenericArguments().FirstOrDefault() : exp.Arguments[0].Type).FullName)
                         {
-                            case "System.DateTime": return $"datediff(second, {args1}, {left})";
-                            case "System.TimeSpan": return $"dateadd(second, ({args1})*-1, {left})";
+                            case "System.DateTime": return $"datediff(second,{args1},{left})";
                         }
                         break;
                     case "Equals": return $"({left} = {args1})";
@@ -558,42 +541,6 @@ namespace FreeSql.Xugu
                         }
                         if (argsSpts.Length > 0) args1 = $"concat({string.Join(", ", argsSpts.Where(a => a != "''"))})";
                         return args1.Replace("%_a1", "%m").Replace("%_a2", "%s");
-                }
-            }
-            return null;
-        }
-        public override string ExpressionLambdaToSqlCallTimeSpan(MethodCallExpression exp, ExpTSC tsc)
-        {
-            Func<Expression, string> getExp = exparg => ExpressionLambdaToSql(exparg, tsc);
-            if (exp.Object == null)
-            {
-                switch (exp.Method.Name)
-                {
-                    case "Compare": return $"({getExp(exp.Arguments[0])}-({getExp(exp.Arguments[1])}))";
-                    case "Equals": return $"({getExp(exp.Arguments[0])} = {getExp(exp.Arguments[1])})";
-                    case "FromDays": return $"(({getExp(exp.Arguments[0])})*{60 * 60 * 24})";
-                    case "FromHours": return $"(({getExp(exp.Arguments[0])})*{60 * 60})";
-                    case "FromMilliseconds": return $"(({getExp(exp.Arguments[0])})/1000)";
-                    case "FromMinutes": return $"(({getExp(exp.Arguments[0])})*60)";
-                    case "FromSeconds": return $"({getExp(exp.Arguments[0])})";
-                    case "FromTicks": return $"(({getExp(exp.Arguments[0])})/10000000)";
-                    case "Parse": return $"cast({getExp(exp.Arguments[0])} as bigint)";
-                    case "ParseExact":
-                    case "TryParse":
-                    case "TryParseExact": return $"cast({getExp(exp.Arguments[0])} as bigint)";
-                }
-            }
-            else
-            {
-                var left = getExp(exp.Object);
-                var args1 = exp.Arguments.Count == 0 ? null : getExp(exp.Arguments[0]);
-                switch (exp.Method.Name)
-                {
-                    case "Add": return $"({left}+{args1})";
-                    case "Subtract": return $"({left}-({args1}))";
-                    case "Equals": return $"({left} = {args1})";
-                    case "CompareTo": return $"({left}-({args1}))";
-                    case "ToString": return $"cast({left} as varchar(100))";
                 }
             }
             return null;

@@ -29,18 +29,18 @@ namespace FreeSql.Dameng
             if (isAdoPool) masterConnectionString = masterConnectionString.Substring("AdoConnectionPool,".Length);
             if (!string.IsNullOrEmpty(masterConnectionString))
                 MasterPool = isAdoPool ?
-                    new DbConnectionStringPool(base.DataType, CoreStrings.S_MasterDatabase, () => new DmConnection(masterConnectionString)) as IObjectPool<DbConnection> :
-                    new DamengConnectionPool(CoreStrings.S_MasterDatabase, masterConnectionString, null, null);
+                    new DbConnectionStringPool(base.DataType, CoreErrorStrings.S_MasterDatabase, () => new DmConnection(masterConnectionString)) as IObjectPool<DbConnection> :
+                    new DamengConnectionPool(CoreErrorStrings.S_MasterDatabase, masterConnectionString, null, null);
 
             slaveConnectionStrings?.ToList().ForEach(slaveConnectionString =>
             {
                 var slavePool = isAdoPool ?
-                        new DbConnectionStringPool(base.DataType, $"{CoreStrings.S_SlaveDatabase}{SlavePools.Count + 1}", () => new DmConnection(slaveConnectionString)) as IObjectPool<DbConnection> :
-                        new DamengConnectionPool($"{CoreStrings.S_SlaveDatabase}{SlavePools.Count + 1}", slaveConnectionString, () => Interlocked.Decrement(ref slaveUnavailables), () => Interlocked.Increment(ref slaveUnavailables));
+                    new DbConnectionStringPool(base.DataType, $"{CoreErrorStrings.S_SlaveDatabase}{SlavePools.Count + 1}", () => new DmConnection(slaveConnectionString)) as IObjectPool<DbConnection> :
+                    new DamengConnectionPool($"{CoreErrorStrings.S_SlaveDatabase}{SlavePools.Count + 1}", slaveConnectionString, () => Interlocked.Decrement(ref slaveUnavailables), () => Interlocked.Increment(ref slaveUnavailables));
                 SlavePools.Add(slavePool);
             });
         }
-        public override object AddslashesProcessParam(object param, Type mapType, ColumnInfo mapColumn)
+        public override object AddslashesProcessParam(object param, Type mapType, Internal.Model.ColumnInfo mapColumn)
         {
             if (param == null) return "NULL";
             if (mapType != null && mapType != param.GetType() && (param is IEnumerable == false))

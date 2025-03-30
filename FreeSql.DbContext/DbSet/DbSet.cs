@@ -69,24 +69,13 @@ namespace FreeSql
         protected virtual IInsert<TEntity> OrmInsert(TEntity entity)
         {
             var insert = OrmInsert();
-            if (entity != null)
-            {
-                (insert as InsertProvider<TEntity>)._source.Add(entity); //防止 Aop.AuditValue 触发两次
-                if (_db.Options.AuditValue != null) 
-                    _db.Options.AuditValue(new DbContextAuditValueEventArgs(Aop.AuditValueType.Insert, _table.Type, entity));
-            }
+            if (entity != null) (insert as InsertProvider<TEntity>)._source.Add(entity); //防止 Aop.AuditValue 触发两次
             return insert;
         }
         protected virtual IInsert<TEntity> OrmInsert(IEnumerable<TEntity> entitys)
         {
             var insert = OrmInsert();
-            if (entitys != null)
-            {
-                (insert as InsertProvider<TEntity>)._source.AddRange(entitys.Where(a => a != null)); //防止 Aop.AuditValue 触发两次
-                if (_db.Options.AuditValue != null)
-                    foreach (var item in entitys)
-                        _db.Options.AuditValue(new DbContextAuditValueEventArgs(Aop.AuditValueType.Insert, _table.Type, item));
-            }
+            if (entitys != null) (insert as InsertProvider<TEntity>)._source.AddRange(entitys.Where(a => a != null)); //防止 Aop.AuditValue 触发两次
             return insert;
         }
 
@@ -95,13 +84,7 @@ namespace FreeSql
             var update = _db.OrmOriginal.Update<TEntity>().AsType(_entityType).WithTransaction(_uow?.GetOrBeginTransaction());
             if (_db.Options.NoneParameter != null) update.NoneParameter(_db.Options.NoneParameter.Value);
             if (_db.Options.EnableGlobalFilter == false) update.DisableGlobalFilter();
-            if (entitys != null)
-            {
-                (update as UpdateProvider<TEntity>)._source.AddRange(entitys.Where(a => a != null)); //防止 Aop.AuditValue 触发两次
-                if (_db.Options.AuditValue != null)
-                    foreach (var item in entitys)
-                        _db.Options.AuditValue(new DbContextAuditValueEventArgs(Aop.AuditValueType.Update, _table.Type, item));
-            }
+            if (entitys != null) (update as UpdateProvider<TEntity>)._source.AddRange(entitys.Where(a => a != null)); //防止 Aop.AuditValue 触发两次
             return update;
         }
         protected virtual IDelete<TEntity> OrmDelete(object dywhere)
@@ -179,10 +162,10 @@ namespace FreeSql
         /// <returns></returns>
         public DbSet<TEntity> AsType(Type entityType)
         {
-            if (entityType == typeof(object)) throw new Exception(CoreStrings.TypeAsType_NotSupport_Object("DbSet"));
+            if (entityType == typeof(object)) throw new Exception(CoreErrorStrings.TypeAsType_NotSupport_Object("DbSet"));
             if (entityType == _entityType) return this;
             var newtb = _db.OrmOriginal.CodeFirst.GetTableByEntity(entityType);
-            _tablePriv = newtb ?? throw new Exception(CoreStrings.Type_AsType_Parameter_Error("DbSet"));
+            _tablePriv = newtb ?? throw new Exception(CoreErrorStrings.Type_AsType_Parameter_Error("DbSet"));
             _tableIdentitysPriv = null;
             _tableReturnColumnsPriv = null;
             _entityType = entityType;
@@ -232,15 +215,26 @@ namespace FreeSql
         /// 附加实体，可用于不查询就更新或删除
         /// </summary>
         /// <param name="data"></param>
-        public void Attach(TEntity data) => AttachRange(new[] { data });
-        public void AttachRange(IEnumerable<TEntity> data)
+        public void Attach(TEntity data) => AttachPriv(new[] { data }, true);
+        public void AttachRange(IEnumerable<TEntity> data) => AttachPriv(data, true);
+        void AttachPriv(IEnumerable<TEntity> data, bool isAuditValue)
         {
             if (data == null || data.Any() == false) return;
-            if (_table.Primarys.Any() == false) throw new Exception(DbContextStrings.CannotAttach_EntityHasNo_PrimaryKey(_db.OrmOriginal.GetEntityString(_entityType, data.First())));
+            if (_table.Primarys.Any() == false) throw new Exception(DbContextErrorStrings.CannotAttach_EntityHasNo_PrimaryKey(_db.OrmOriginal.GetEntityString(_entityType, data.First())));
             foreach (var item in data)
             {
+                if (isAuditValue)
+                {
+                    foreach (var col in _table.Columns.Values) //#1746
+                    {
+                        object val = col.GetValue(item);
+                        if (val == null && col.Attribute.MapType == typeof(string) && col.Attribute.IsNullable == false)
+                            col.SetValue(item, val = "");
+                    }
+                    _db.Options.AuditValue?.Invoke(new DbContextAuditValueEventArgs(Aop.AuditValueType.Update, _table.Type, item));
+                }
                 var key = _db.OrmOriginal.GetEntityKeyString(_entityType, item, false);
-                if (string.IsNullOrEmpty(key)) throw new Exception(DbContextStrings.CannotAttach_PrimaryKey_NotSet(_db.OrmOriginal.GetEntityString(_entityType, item)));
+                if (string.IsNullOrEmpty(key)) throw new Exception(DbContextErrorStrings.CannotAttach_PrimaryKey_NotSet(_db.OrmOriginal.GetEntityString(_entityType, item)));
 
                 _states.AddOrUpdate(key, k => CreateEntityState(item), (k, ov) =>
                 {
@@ -275,9 +269,9 @@ namespace FreeSql
         public Dictionary<string, object[]> CompareState(TEntity newdata)
         {
             if (newdata == null) return null;
-            if (_table.Primarys.Any() == false) throw new Exception(DbContextStrings.Incomparable_EntityHasNo_PrimaryKey(_db.OrmOriginal.GetEntityString(_entityType, newdata)));
+            if (_table.Primarys.Any() == false) throw new Exception(DbContextErrorStrings.Incomparable_EntityHasNo_PrimaryKey(_db.OrmOriginal.GetEntityString(_entityType, newdata)));
             var key = _db.OrmOriginal.GetEntityKeyString(_entityType, newdata, false);
-            if (string.IsNullOrEmpty(key)) throw new Exception(DbContextStrings.Incomparable_PrimaryKey_NotSet(_db.OrmOriginal.GetEntityString(_entityType, newdata)));
+            if (string.IsNullOrEmpty(key)) throw new Exception(DbContextErrorStrings.Incomparable_PrimaryKey_NotSet(_db.OrmOriginal.GetEntityString(_entityType, newdata)));
             if (_states.TryGetValue(key, out var oldState) == false || oldState == null)
                 return _table.ColumnsByCs.ToDictionary(a => a.Key, a => new object[]
                 {
@@ -287,8 +281,8 @@ namespace FreeSql
 
             return _db.OrmOriginal.CompareEntityValueReturnColumns(_entityType, oldState.Value, newdata, false).ToDictionary(a => a, a => new object[]
             {
-                _db.OrmOriginal.GetEntityValueWithPropertyName(_entityType, newdata, a),
-                _db.OrmOriginal.GetEntityValueWithPropertyName(_entityType, oldState.Value, a)
+                _db.OrmOriginal.GetEntityValueWithPropertyName(_entityType, newdata, _table.Columns[a].CsName),
+                _db.OrmOriginal.GetEntityValueWithPropertyName(_entityType, oldState.Value, _table.Columns[a].CsName)
             });
         }
 
@@ -337,10 +331,11 @@ namespace FreeSql
             }
             if (_table.Primarys.Any() == false)
             {
-                if (isThrow) throw new Exception(DbContextStrings.CannotAdd_EntityHasNo_PrimaryKey(_db.OrmOriginal.GetEntityString(_entityType, data)));
+                if (isThrow) throw new Exception(DbContextErrorStrings.CannotAdd_EntityHasNo_PrimaryKey(_db.OrmOriginal.GetEntityString(_entityType, data)));
                 return false;
             }
             FreeSql.Internal.CommonProvider.InsertProvider<TEntity>.AuditDataValue(this, data, _db.OrmOriginal, _table, null);
+            _db.Options.AuditValue?.Invoke(new DbContextAuditValueEventArgs(Aop.AuditValueType.Insert, _table.Type, data));
             var key = _db.OrmOriginal.GetEntityKeyString(_entityType, data, true);
             if (string.IsNullOrEmpty(key))
             {
@@ -353,14 +348,14 @@ namespace FreeSql
                     case DataType.OdbcPostgreSQL:
                     case DataType.CustomPostgreSQL:
                     case DataType.KingbaseES:
-                    case DataType.OdbcKingbaseES:
                     case DataType.ShenTong:
+                    case DataType.DuckDB:
                     case DataType.ClickHouse:
                         return true;
                     default:
                         if (_tableIdentitys.Length == 1 && _table.Primarys.Length == 1)
                             return true;
-                        if (isThrow) throw new Exception(DbContextStrings.CannotAdd_PrimaryKey_NotSet(_db.OrmOriginal.GetEntityString(_entityType, data)));
+                        if (isThrow) throw new Exception(DbContextErrorStrings.CannotAdd_PrimaryKey_NotSet(_db.OrmOriginal.GetEntityString(_entityType, data)));
                         return false;
                 }
             }
@@ -369,14 +364,14 @@ namespace FreeSql
 				//不可添加，已存在于状态管理
 				//if (_states.ContainsKey(key))
 				//{
-				//    if (isThrow) throw new Exception(DbContextStrings.CannotAdd_AlreadyExistsInStateManagement(_db.OrmOriginal.GetEntityString(_entityType, data)));
+				//    if (isThrow) throw new Exception(DbContextErrorStrings.CannotAdd_AlreadyExistsInStateManagement(_db.OrmOriginal.GetEntityString(_entityType, data)));
 				//    return false;
 				//}
 				if (_db.OrmOriginal.Ado.DataType == DataType.ClickHouse) return true;
                 var idval = _db.OrmOriginal.GetEntityIdentityValueWithPrimary(_entityType, data);
                 if (idval > 0)
                 {
-                    if (isThrow) throw new Exception(DbContextStrings.CannotAdd_SelfIncreasingHasValue(_db.OrmOriginal.GetEntityString(_entityType, data)));
+                    if (isThrow) throw new Exception(DbContextErrorStrings.CannotAdd_SelfIncreasingHasValue(_db.OrmOriginal.GetEntityString(_entityType, data)));
                     return false;
                 }
             }
@@ -403,19 +398,20 @@ namespace FreeSql
             }
             if (_table.Primarys.Any() == false)
             {
-                if (isThrow) throw new Exception(DbContextStrings.CannotUpdate_EntityHasNo_PrimaryKey(_db.OrmOriginal.GetEntityString(_entityType, data)));
+                if (isThrow) throw new Exception(DbContextErrorStrings.CannotUpdate_EntityHasNo_PrimaryKey(_db.OrmOriginal.GetEntityString(_entityType, data)));
                 return false;
             }
             FreeSql.Internal.CommonProvider.UpdateProvider<TEntity>.AuditDataValue(this, data, _db.OrmOriginal, _table, null);
+            _db.Options.AuditValue?.Invoke(new DbContextAuditValueEventArgs(Aop.AuditValueType.Update, _table.Type, data));
             var key = _db.OrmOriginal.GetEntityKeyString(_entityType, data, false);
             if (string.IsNullOrEmpty(key))
             {
-                if (isThrow) throw new Exception(DbContextStrings.CannotUpdate_PrimaryKey_NotSet(_db.OrmOriginal.GetEntityString(_entityType, data)));
+                if (isThrow) throw new Exception(DbContextErrorStrings.CannotUpdate_PrimaryKey_NotSet(_db.OrmOriginal.GetEntityString(_entityType, data)));
                 return false;
             }
             if (_states.TryGetValue(key, out var tryval) == false)
             {
-                if (isThrow) throw new Exception(DbContextStrings.CannotUpdate_DataShouldQueryOrAttach(_db.OrmOriginal.GetEntityString(_entityType, data)));
+                if (isThrow) throw new Exception(DbContextErrorStrings.CannotUpdate_DataShouldQueryOrAttach(_db.OrmOriginal.GetEntityString(_entityType, data)));
                 return false;
             }
             return true;
@@ -441,13 +437,13 @@ namespace FreeSql
             }
             if (_table.Primarys.Any() == false)
             {
-                if (isThrow) throw new Exception(DbContextStrings.CannotDelete_EntityHasNo_PrimaryKey(_db.OrmOriginal.GetEntityString(_entityType, data)));
+                if (isThrow) throw new Exception(DbContextErrorStrings.CannotDelete_EntityHasNo_PrimaryKey(_db.OrmOriginal.GetEntityString(_entityType, data)));
                 return false;
             }
             var key = _db.OrmOriginal.GetEntityKeyString(_entityType, data, false);
             if (string.IsNullOrEmpty(key))
             {
-                if (isThrow) throw new Exception(DbContextStrings.CannotDelete_PrimaryKey_NotSet(_db.OrmOriginal.GetEntityString(_entityType, data)));
+                if (isThrow) throw new Exception(DbContextErrorStrings.CannotDelete_PrimaryKey_NotSet(_db.OrmOriginal.GetEntityString(_entityType, data)));
                 return false;
             }
             //if (_states.TryGetValue(key, out var tryval) == false) {

@@ -15,6 +15,15 @@ namespace FreeSql
 {
     partial class AggregateRootRepository<TEntity>
     {
+        public virtual void SaveMany(TEntity entity, string propertyName)
+        {
+            var tracking = new AggregateRootTrackingChangeInfo();
+            var stateKey = Orm.GetEntityKeyString(EntityType, entity, false);
+            if (_states.TryGetValue(stateKey, out var state) == false) throw new Exception($"AggregateRootRepository 使用仓储对象查询后，才可以保存数据 {Orm.GetEntityString(EntityType, entity)}");
+            AggregateRootUtils.CompareEntityValue(_boundaryName, Orm, EntityType, state.Value, entity, propertyName, tracking);
+            SaveTrackingChange(tracking);
+            Attach(entity); //应该只存储 propertyName 内容
+        }
 
         #region BeginEdit/EndEdit
         List<TEntity> _dataEditing;
@@ -23,7 +32,7 @@ namespace FreeSql
         {
             if (data == null) return;
             var table = Orm.CodeFirst.GetTableByEntity(EntityType);
-            if (table.Primarys.Any() == false) throw new Exception(DbContextStrings.CannotEdit_EntityHasNo_PrimaryKey(Orm.GetEntityString(EntityType, data.First())));
+            if (table.Primarys.Any() == false) throw new Exception(DbContextErrorStrings.CannotEdit_EntityHasNo_PrimaryKey(Orm.GetEntityString(EntityType, data.First())));
             _statesEditing.Clear();
             _dataEditing = data;
             foreach (var item in data)
@@ -106,7 +115,7 @@ namespace FreeSql
             bool LocalCanInsert(Type entityType, object entity, bool isadd)
             {
                 var stateKey = rootRepository.Orm.GetEntityKeyString(entityType, entity, false);
-                if (stateKey == null) return true;
+                if (string.IsNullOrEmpty(stateKey)) return true;
                 if (ignores.TryGetValue(entityType, out var stateKeys) == false)
                 {
                     if (isadd)
@@ -207,7 +216,7 @@ namespace FreeSql
             var stateKey = Orm.GetEntityKeyString(EntityType, entity, false);
             if (entity == null) throw new ArgumentNullException(nameof(entity));
             var table = Orm.CodeFirst.GetTableByEntity(EntityType);
-            if (table.Primarys.Any() == false) throw new Exception(DbContextStrings.CannotAdd_EntityHasNo_PrimaryKey(Orm.GetEntityString(EntityType, entity)));
+            if (table.Primarys.Any() == false) throw new Exception(DbContextErrorStrings.CannotAdd_EntityHasNo_PrimaryKey(Orm.GetEntityString(EntityType, entity)));
 
             var flagExists = ExistsInStates(entity);
             if (flagExists == false)
@@ -262,6 +271,7 @@ namespace FreeSql
             var affrows = 0;
             for (var a = tracking.DeleteLog.Count - 1; a >= 0; a--)
 			{
+                if (tracking.DeleteLog[a].Item2.Any() == false) continue;
 				var delete = Orm.Delete<object>().AsType(tracking.DeleteLog[a].Item1);
 				if (_asTableRule != null) delete.AsTable(old => _asTableRule(tracking.DeleteLog[a].Item1, old));
 				affrows += delete.WhereDynamic(tracking.DeleteLog[a].Item2).ExecuteAffrows();
@@ -277,17 +287,6 @@ namespace FreeSql
             return affrows;
         }
 
-        public virtual void SaveMany(TEntity entity, string propertyName)
-        {
-            var tracking = new AggregateRootTrackingChangeInfo();
-            var stateKey = Orm.GetEntityKeyString(EntityType, entity, false);
-            if (_states.TryGetValue(stateKey, out var state) == false) throw new Exception($"AggregateRootRepository 使用仓储对象查询后，才可以保存数据 {Orm.GetEntityString(EntityType, entity)}");
-            AggregateRootUtils.CompareEntityValue(_boundaryName, Orm, EntityType, state.Value, entity, propertyName, tracking);
-            SaveTrackingChange(tracking);
-            Attach(entity); //应该只存储 propertyName 内容
-        }
-
-
         int SaveTrackingChange(AggregateRootTrackingChangeInfo tracking)
         {
             var affrows = 0;
@@ -301,7 +300,8 @@ namespace FreeSql
             }
 
             for (var a = tracking.DeleteLog.Count - 1; a >= 0; a--)
-			{
+            {
+                if (tracking.DeleteLog[a].Item2.Any() == false) continue;
                 var delete = Orm.Delete<object>().AsType(tracking.DeleteLog[a].Item1);
 				if (_asTableRule != null) delete.AsTable(old => _asTableRule(tracking.DeleteLog[a].Item1, old));
 				affrows += delete.WhereDynamic(tracking.DeleteLog[a].Item2).ExecuteAffrows();

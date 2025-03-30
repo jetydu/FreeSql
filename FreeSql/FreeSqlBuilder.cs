@@ -29,7 +29,7 @@ namespace FreeSql
         bool _isLazyLoading = false;
         bool _isExitAutoDisposePool = true;
         bool _isQuoteSqlName = true;
-        bool? _isAdoConnectionPool = false;
+        bool? _isAdoConnectionPool = null;
         MappingPriorityType[] _mappingPriorityTypes;
         NameConvertType _nameConvertType = NameConvertType.None;
         Action<DbCommand> _aopCommandExecuting = null;
@@ -45,7 +45,7 @@ namespace FreeSql
         /// <returns></returns>
         public FreeSqlBuilder UseConnectionString(DataType dataType, string connectionString, Type providerType = null)
         {
-            if (_connectionFactory != null) throw new Exception(CoreStrings.Has_Specified_Cannot_Specified_Second("UseConnectionFactory", "UseConnectionString"));
+            if (_connectionFactory != null) throw new Exception(CoreErrorStrings.Has_Specified_Cannot_Specified_Second("UseConnectionFactory", "UseConnectionString"));
             _dataType = dataType;
             _masterConnectionString = connectionString;
             _providerType = providerType;
@@ -86,13 +86,13 @@ namespace FreeSql
         /// <returns></returns>
         public FreeSqlBuilder UseSlave(params string[] slaveConnectionString)
         {
-            if (_connectionFactory != null) throw new Exception(CoreStrings.Has_Specified_Cannot_Specified_Second("UseConnectionFactory", "UseSlave"));
+            if (_connectionFactory != null) throw new Exception(CoreErrorStrings.Has_Specified_Cannot_Specified_Second("UseConnectionFactory", "UseSlave"));
             _slaveConnectionString = slaveConnectionString;
             return this;
         }
         public FreeSqlBuilder UseSlaveWeight(params int[] slaveWeights)
         {
-            if (_slaveConnectionString?.Length != slaveWeights.Length) throw new Exception(CoreStrings.Different_Number_SlaveConnectionString_SlaveWeights);
+            if (_slaveConnectionString?.Length != slaveWeights.Length) throw new Exception(CoreErrorStrings.Different_Number_SlaveConnectionString_SlaveWeights);
             _slaveWeights = slaveWeights;
             return this;
         }
@@ -105,8 +105,8 @@ namespace FreeSql
         /// <returns></returns>
         public FreeSqlBuilder UseConnectionFactory(DataType dataType, Func<DbConnection> connectionFactory, Type providerType = null)
         {
-            if (string.IsNullOrEmpty(_masterConnectionString) == false) throw new Exception(CoreStrings.Has_Specified_Cannot_Specified_Second("UseConnectionString", "UseConnectionFactory"));
-            if (_slaveConnectionString?.Any() == true) throw new Exception(CoreStrings.Has_Specified_Cannot_Specified_Second("UseSlave", "UseConnectionFactory"));
+            if (string.IsNullOrEmpty(_masterConnectionString) == false) throw new Exception(CoreErrorStrings.Has_Specified_Cannot_Specified_Second("UseConnectionString", "UseConnectionFactory"));
+            if (_slaveConnectionString?.Any() == true) throw new Exception(CoreErrorStrings.Has_Specified_Cannot_Specified_Second("UseSlave", "UseConnectionFactory"));
             _dataType = dataType;
             _connectionFactory = connectionFactory;
             _providerType = providerType;
@@ -244,7 +244,7 @@ namespace FreeSql
         public IFreeSql Build() => Build<IFreeSql>();
         public IFreeSql<TMark> Build<TMark>()
         {
-            if (string.IsNullOrEmpty(_masterConnectionString) && _connectionFactory == null) throw new Exception(CoreStrings.Check_UseConnectionString);
+            if (string.IsNullOrEmpty(_masterConnectionString) && _connectionFactory == null) throw new Exception(CoreErrorStrings.Check_UseConnectionString);
             IFreeSql<TMark> ret = null;
             var type = _providerType;
             if (type != null)
@@ -254,7 +254,7 @@ namespace FreeSql
             }
             else
             {
-                Action<string, string> throwNotFind = (dll, providerType) => throw new Exception(CoreStrings.Missing_FreeSqlProvider_Package_Reason(dll, providerType));
+                Action<string, string> throwNotFind = (dll, providerType) => throw new Exception(CoreErrorStrings.Missing_FreeSqlProvider_Package_Reason(dll, providerType));
                 switch (_dataType)
                 {
                     case DataType.MySql:
@@ -306,32 +306,25 @@ namespace FreeSql
                         if (type == null) throwNotFind("FreeSql.Provider.Odbc.dll", "FreeSql.Odbc.Default.OdbcProvider<>");
                         break;
 
-                    case DataType.OdbcDameng:
-                        type = Type.GetType("FreeSql.Odbc.Dameng.OdbcDamengProvider`1,FreeSql.Provider.Odbc")?.MakeGenericType(typeof(TMark));
-                        if (type == null) throwNotFind("FreeSql.Provider.Odbc.dll", "FreeSql.Odbc.Dameng.OdbcDamengProvider<>");
-                        break;
-
                     case DataType.MsAccess:
                         type = Type.GetType("FreeSql.MsAccess.MsAccessProvider`1,FreeSql.Provider.MsAccess")?.MakeGenericType(typeof(TMark));
                         if (type == null) throwNotFind("FreeSql.Provider.MsAccess.dll", "FreeSql.MsAccess.MsAccessProvider<>");
                         break;
 
                     case DataType.Dameng:
+                        if (_isAdoConnectionPool == null) _isAdoConnectionPool = true;
                         type = Type.GetType("FreeSql.Dameng.DamengProvider`1,FreeSql.Provider.Dameng")?.MakeGenericType(typeof(TMark));
                         if (type == null) throwNotFind("FreeSql.Provider.Dameng.dll", "FreeSql.Dameng.DamengProvider<>");
                         break;
 
-                    case DataType.OdbcKingbaseES:
-                        type = Type.GetType("FreeSql.Odbc.KingbaseES.OdbcKingbaseESProvider`1,FreeSql.Provider.Odbc")?.MakeGenericType(typeof(TMark));
-                        if (type == null) throwNotFind("FreeSql.Provider.Odbc.dll", "FreeSql.Odbc.KingbaseES.OdbcKingbaseESProvider<>");
-                        break;
-
                     case DataType.ShenTong:
+                        if (_isAdoConnectionPool == null) _isAdoConnectionPool = true;
                         type = Type.GetType("FreeSql.ShenTong.ShenTongProvider`1,FreeSql.Provider.ShenTong")?.MakeGenericType(typeof(TMark));
                         if (type == null) throwNotFind("FreeSql.Provider.ShenTong.dll", "FreeSql.ShenTong.ShenTongProvider<>");
                         break;
 
                     case DataType.KingbaseES:
+                        if (_isAdoConnectionPool == null) _isAdoConnectionPool = true;
                         type = Type.GetType("FreeSql.KingbaseES.KingbaseESProvider`1,FreeSql.Provider.KingbaseES")?.MakeGenericType(typeof(TMark));
                         if (type == null) throwNotFind("FreeSql.Provider.KingbaseES.dll", "FreeSql.KingbaseES.KingbaseESProvider<>");
                         break;
@@ -387,7 +380,17 @@ namespace FreeSql
                         if (type == null) throwNotFind("FreeSql.Provider.Custom.dll", "FreeSql.Custom.PostgreSQL.CustomPostgreSQLProvider<>");
                         break;
 
-                    default: throw new Exception(CoreStrings.NotSpecified_UseConnectionString_UseConnectionFactory);
+                    case DataType.DuckDB:
+                        type = Type.GetType("FreeSql.Duckdb.DuckdbProvider`1,FreeSql.Provider.Duckdb")?.MakeGenericType(typeof(TMark));
+                        if (type == null) throwNotFind("FreeSql.Provider.Duckdb.dll", "FreeSql.Duckdb.DuckdbProvider<>");
+                        break;
+
+                    case DataType.TDengine:
+                        type = Type.GetType("FreeSql.TDengine.TDengineProvider`1,FreeSql.Provider.TDengine")?.MakeGenericType(typeof(TMark));
+                        if (type == null) throwNotFind("FreeSql.Provider.TDengine.dll", "FreeSql.TDengine.TDengineProvider<>");
+                        break;
+
+                    default: throw new Exception(CoreErrorStrings.NotSpecified_UseConnectionString_UseConnectionFactory);
                 }
             }
             ret = Activator.CreateInstance(type, new object[]
@@ -615,6 +618,7 @@ namespace FreeSql
                 {
                     if (e.Property.PropertyType == typeHandler.Type)
                     {
+                        typeHandler.FluentApi(new ColumnFluent(e.ModifyResult, e.Property, e.EntityType));
                         if (_dicTypeHandlerTypes.ContainsKey(e.Property.PropertyType)) return;
                         if (e.Property.PropertyType.NullableTypeOrThis() != typeof(DateTime) &&
                             FreeSql.Internal.Utils.dicExecuteArrayRowReadClassOrTuple.ContainsKey(e.Property.PropertyType))

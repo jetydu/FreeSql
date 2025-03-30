@@ -32,11 +32,6 @@ namespace FreeSql.Firebird
 
         public void Return(Object<DbConnection> obj, Exception exception, bool isRecreate = false)
         {
-            if (exception != null && exception is FbException)
-            {
-                if (obj.Value.Ping() == false)
-                    base.SetUnavailable(exception, obj.LastGetTimeCopy);
-            }
             base.Return(obj, isRecreate);
         }
     }
@@ -45,7 +40,7 @@ namespace FreeSql.Firebird
     {
 
         internal FirebirdConnectionPool _pool;
-        public string Name { get; set; } = $"Firebird FbConnection {CoreStrings.S_ObjectPool}";
+        public string Name { get; set; } = $"Firebird FbConnection {CoreErrorStrings.S_ObjectPool}";
         public int PoolSize { get; set; } = 100;
         public TimeSpan SyncGetTimeout { get; set; } = TimeSpan.FromSeconds(10);
         public TimeSpan IdleTimeout { get; set; } = TimeSpan.FromSeconds(20);
@@ -120,25 +115,10 @@ namespace FreeSql.Firebird
             if (_pool.IsAvailable)
             {
                 if (obj.Value == null)
-                {
-                    _pool.SetUnavailable(new Exception(CoreStrings.S_ConnectionStringError), obj.LastGetTimeCopy);
-                    throw new Exception(CoreStrings.S_ConnectionStringError_Check(this.Name));
-                }
+                    throw new Exception(CoreErrorStrings.S_ConnectionStringError_Check(this.Name));
 
-                if (obj.Value.State != ConnectionState.Open || DateTime.Now.Subtract(obj.LastReturnTime).TotalSeconds > 60 && obj.Value.Ping() == false)
-                {
-
-                    try
-                    {
-                        obj.Value.Open();
-                    }
-                    catch (Exception ex)
-                    {
-                        if (_pool.SetUnavailable(ex, obj.LastGetTimeCopy) == true)
-                            throw new Exception($"【{this.Name}】Block access and wait for recovery: {ex.Message}");
-                        throw ex;
-                    }
-                }
+                if (obj.Value.State != ConnectionState.Open)
+                    obj.Value.Open();
             }
         }
 
@@ -150,25 +130,10 @@ namespace FreeSql.Firebird
             if (_pool.IsAvailable)
             {
                 if (obj.Value == null)
-                {
-                    _pool.SetUnavailable(new Exception(CoreStrings.S_ConnectionStringError), obj.LastGetTimeCopy);
-                    throw new Exception(CoreStrings.S_ConnectionStringError_Check(this.Name));
-                }
+                    throw new Exception(CoreErrorStrings.S_ConnectionStringError_Check(this.Name));
 
-                if (obj.Value.State != ConnectionState.Open || DateTime.Now.Subtract(obj.LastReturnTime).TotalSeconds > 60 && (await obj.Value.PingAsync()) == false)
-                {
-
-                    try
-                    {
-                        await obj.Value.OpenAsync();
-                    }
-                    catch (Exception ex)
-                    {
-                        if (_pool.SetUnavailable(ex, obj.LastGetTimeCopy) == true)
-                            throw new Exception($"【{this.Name}】Block access and wait for recovery: {ex.Message}");
-                        throw ex;
-                    }
-                }
+                if (obj.Value.State != ConnectionState.Open)
+                    await obj.Value.OpenAsync();
             }
         }
 #endif

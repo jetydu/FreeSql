@@ -38,10 +38,10 @@ namespace FreeSql.Custom
                 if (_limit > 0 && _utils.Adapter.SelectTopStyle == CustomAdapter.SelecTopStyle.Top) sb.Append("TOP ").Append(_skip + _limit).Append(" ");
                 sb.Append(field);
                 if (_skip > 0 && _utils.Adapter.SelectTopStyle == CustomAdapter.SelecTopStyle.Top)
-                throw new NotImplementedException(CoreStrings.S_NotImplementSkipOffset("Custom"));
+                throw new NotImplementedException(CoreErrorStrings.S_NotImplementSkipOffset("Custom"));
 
                 sb.Append(" \r\nFROM ");
-                var tbsjoin = _tables.Where(a => a.Type != SelectTableInfoType.From).ToArray();
+                var tbsjoin = _tables.Where(a => a.Type != SelectTableInfoType.From && a.Type != SelectTableInfoType.Parent).ToArray();
                 var tbsfrom = _tables.Where(a => a.Type == SelectTableInfoType.From).ToArray();
                 for (var a = 0; a < tbsfrom.Length; a++)
                 {

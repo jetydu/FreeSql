@@ -37,7 +37,7 @@ namespace FreeSql.Internal.CommonProvider
             _commonExpression = commonExpression;
             _table = _commonUtils.GetTableByEntity(typeof(T1));
             _isAutoSyncStructure = _orm.CodeFirst.IsAutoSyncStructure;
-            this.Where(_commonUtils.WhereObject(_table, "", dywhere));
+            this.Where(_commonUtils.WhereObject(_table, "", dywhere, _params));
             if (_isAutoSyncStructure && typeof(T1) != typeof(object)) _orm.CodeFirst.SyncStructure<T1>();
             _whereGlobalFilter = _orm.GlobalFilter.GetFilters();
         }
@@ -116,10 +116,10 @@ namespace FreeSql.Internal.CommonProvider
             return this;
         }
         public IDelete<T1> Where(T1 item) => this.Where(new[] { item });
-        public IDelete<T1> Where(IEnumerable<T1> items) => this.Where(_commonUtils.WhereItems(_table.Primarys, "", items));
+        public IDelete<T1> Where(IEnumerable<T1> items) => this.Where(_commonUtils.WhereItems(_table.Primarys, "", items, _params));
         public IDelete<T1> WhereDynamic(object dywhere, bool not = false) => not == false ?
-            this.Where(_commonUtils.WhereObject(_table, "", dywhere)) :
-            this.Where($"not({_commonUtils.WhereObject(_table, "", dywhere)})");
+            this.Where(_commonUtils.WhereObject(_table, "", dywhere, _params)) :
+            this.Where($"not({_commonUtils.WhereObject(_table, "", dywhere, _params)})");
 		public IDelete<T1> WhereDynamicFilter(DynamicFilterInfo filter)
         {
             var alias = "t_" + Guid.NewGuid().ToString("n").Substring(0, 8);
@@ -154,10 +154,11 @@ namespace FreeSql.Internal.CommonProvider
 
         protected string TableRuleInvoke()
         {
-            if (_tableRule == null) return _table.DbName;
-            var newname = _tableRule(_table.DbName);
-            if (newname == _table.DbName) return _table.DbName;
-            if (string.IsNullOrEmpty(newname)) return _table.DbName;
+            if (_tableRule == null && _table.AsTableImpl == null) return _commonUtils.GetEntityTableAopName(_table, true);
+            var tbname = _table?.DbName ?? "";
+            var newname = _tableRule(tbname);
+            if (newname == tbname) return tbname;
+            if (string.IsNullOrEmpty(newname)) return tbname;
             if (_orm.CodeFirst.IsSyncStructureToLower) newname = newname.ToLower();
             if (_orm.CodeFirst.IsSyncStructureToUpper) newname = newname.ToUpper();
             if (_isAutoSyncStructure) _orm.CodeFirst.SyncStructure(_table.Type, newname);
@@ -175,10 +176,10 @@ namespace FreeSql.Internal.CommonProvider
         }
         public IDelete<T1> AsType(Type entityType)
         {
-            if (entityType == typeof(object)) throw new Exception(CoreStrings.TypeAsType_NotSupport_Object("IDelete"));
+            if (entityType == typeof(object)) throw new Exception(CoreErrorStrings.TypeAsType_NotSupport_Object("IDelete"));
             if (entityType == _table.Type) return this;
             var newtb = _commonUtils.GetTableByEntity(entityType);
-            _table = newtb ?? throw new Exception(CoreStrings.Type_AsType_Parameter_Error("IDelete"));
+            _table = newtb ?? throw new Exception(CoreErrorStrings.Type_AsType_Parameter_Error("IDelete"));
             if (_isAutoSyncStructure) _orm.CodeFirst.SyncStructure(entityType);
             return this;
         }

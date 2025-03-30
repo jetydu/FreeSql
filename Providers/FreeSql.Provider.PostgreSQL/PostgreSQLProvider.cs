@@ -18,14 +18,24 @@ using System.Threading;
 
 namespace FreeSql.PostgreSQL
 {
-
-    public class PostgreSQLProvider<TMark> : BaseDbProvider, IFreeSql<TMark>
+    public interface IPostgreSQLProviderOptions
     {
+        bool UseMergeInto{ get; set; }
+    }
+
+    public class PostgreSQLProvider<TMark> : BaseDbProvider, IFreeSql<TMark>, IPostgreSQLProviderOptions
+    {
+        public bool UseMergeInto { get; set; }
+
         static int _firstInit = 1;
         static void InitInternal()
         {
             if (Interlocked.Exchange(ref _firstInit, 0) == 1) //不能放在 static ctor .NetFramework 可能报初始化类型错误
             {
+#if net60
+                Utils.dicExecuteArrayRowReadClassOrTuple[typeof(DateOnly)] = true;
+                Utils.dicExecuteArrayRowReadClassOrTuple[typeof(TimeOnly)] = true;
+#endif
                 Utils.dicExecuteArrayRowReadClassOrTuple[typeof(BigInteger)] = true;
                 Utils.dicExecuteArrayRowReadClassOrTuple[typeof(BitArray)] = true;
                 Utils.dicExecuteArrayRowReadClassOrTuple[typeof(NpgsqlPoint)] = true;
@@ -141,6 +151,7 @@ namespace FreeSql.PostgreSQL
 
         ~PostgreSQLProvider() => this.Dispose();
         int _disposeCounter;
+
         public override void Dispose()
         {
             if (Interlocked.Increment(ref _disposeCounter) != 1) return;

@@ -50,7 +50,7 @@ namespace FreeSql.Internal.CommonProvider
 				}
 				else
 				{
-					if (_orm.Ado.MasterPool == null) throw new Exception(CoreStrings.MasterPool_IsNull_UseTransaction);
+					if (_orm.Ado.MasterPool == null) throw new Exception(CoreErrorStrings.MasterPool_IsNull_UseTransaction);
 					using (var conn = await _orm.Ado.MasterPool.GetAsync())
 					{
 						_transaction = conn.Value.BeginTransaction();
@@ -65,12 +65,12 @@ namespace FreeSql.Internal.CommonProvider
 								await executeAsync();
 							}
 							_transaction.Commit();
-							_orm.Aop.TraceAfterHandler?.Invoke(this, new Aop.TraceAfterEventArgs(transBefore, CoreStrings.Commit, null));
+							_orm.Aop.TraceAfterHandler?.Invoke(this, new Aop.TraceAfterEventArgs(transBefore, CoreErrorStrings.Commit, null));
 						}
 						catch (Exception ex)
 						{
 							_transaction.Rollback();
-							_orm.Aop.TraceAfterHandler?.Invoke(this, new Aop.TraceAfterEventArgs(transBefore, CoreStrings.RollBack, ex));
+							_orm.Aop.TraceAfterHandler?.Invoke(this, new Aop.TraceAfterEventArgs(transBefore, CoreErrorStrings.RollBack, ex));
 							throw;
 						}
 						_transaction = null;
@@ -143,13 +143,20 @@ namespace FreeSql.Internal.CommonProvider
 		public abstract Task<int> ExecuteAffrowsAsync(CancellationToken cancellationToken = default);
 		protected abstract Task<List<TReturn>> ExecuteUpdatedAsync<TReturn>(IEnumerable<ColumnInfo> columns, CancellationToken cancellationToken = default);
 
-		public Task<List<T1>> ExecuteUpdatedAsync(CancellationToken cancellationToken = default) => ExecuteUpdatedAsync<T1>(_table.ColumnsByPosition, cancellationToken);
-		public Task<List<TReturn>> ExecuteUpdatedAsync<TReturn>(Expression<Func<T1, TReturn>> returnColumns, CancellationToken cancellationToken = default)
+		async public Task<List<T1>> ExecuteUpdatedAsync(CancellationToken cancellationToken = default)
+		{
+			var ret = await ExecuteUpdatedAsync<T1>(_table.ColumnsByPosition, cancellationToken);
+            if (_table.TypeLazySetOrm != null) ret.ForEach(item => _table.TypeLazySetOrm.Invoke(item, new object[] { _orm }));
+            return ret;
+        }
+		async public Task<List<TReturn>> ExecuteUpdatedAsync<TReturn>(Expression<Func<T1, TReturn>> returnColumns, CancellationToken cancellationToken = default)
 		{
 			var cols = _commonExpression.ExpressionSelectColumns_MemberAccess_New_NewArrayInit(null, null, returnColumns?.Body, false, null)
 				.Distinct().Select(a => _table.ColumnsByCs.TryGetValue(a, out var c) ? c : null).Where(a => a != null).ToArray();
-			return ExecuteUpdatedAsync<TReturn>(cols, cancellationToken);
-		}
+			var ret = await ExecuteUpdatedAsync<TReturn>(cols, cancellationToken);
+            if (_table.TypeLazySetOrm != null) ret.ForEach(item => _table.TypeLazySetOrm.Invoke(item, new object[] { _orm }));
+            return ret;
+        }
 #endif
 	}
 }

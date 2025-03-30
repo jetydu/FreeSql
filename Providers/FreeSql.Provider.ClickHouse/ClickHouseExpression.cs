@@ -280,35 +280,6 @@ namespace FreeSql.ClickHouse
                 return true;
             return DateTime.TryParse(date, out var time);
         }
-        public override string ExpressionLambdaToSqlMemberAccessTimeSpan(MemberExpression exp, ExpTSC tsc)
-        {
-            if (exp.Expression == null)
-            {
-                switch (exp.Member.Name)
-                {
-                    case "Zero": return "0";
-                    case "MinValue": return "-922337203685477580"; //微秒 Ticks / 10
-                    case "MaxValue": return "922337203685477580";
-                }
-                return null;
-            }
-            var left = ExpressionLambdaToSql(exp.Expression, tsc);
-            switch (exp.Member.Name)
-            {
-                case "Days": return $"intDiv(({left})/{60 * 60 * 24})";
-                case "Hours": return $"intDiv(({left})/{60 * 60}%24)";
-                case "Milliseconds": return $"(cast({left} as Int64)*1000)";
-                case "Minutes": return $"intDiv(({left})/60%60)";
-                case "Seconds": return $"(({left})%60)";
-                case "Ticks": return $"(intDiv({left} as Int64)*10000000)";
-                case "TotalDays": return $"(({left})/{60 * 60 * 24})";
-                case "TotalHours": return $"(({left})/{60 * 60})";
-                case "TotalMilliseconds": return $"(cast({left} as Int64)*1000)";
-                case "TotalMinutes": return $"(({left})/60)";
-                case "TotalSeconds": return $"({left})";
-            }
-            return null;
-        }
 
         public override string ExpressionLambdaToSqlCallString(MethodCallExpression exp, ExpTSC tsc)
         {
@@ -328,7 +299,7 @@ namespace FreeSql.ClickHouse
                             return _common.StringConcat(concatNewArrExp.Expressions.Select(a => getExp(a)).ToArray(), null);
                         return _common.StringConcat(exp.Arguments.Select(a => getExp(a)).ToArray(), null);
                     case "Format":
-                        if (exp.Arguments[0].NodeType != ExpressionType.Constant) throw new Exception(CoreStrings.Not_Implemented_Expression_ParameterUseConstant(exp,exp.Arguments[0]));
+                        if (exp.Arguments[0].NodeType != ExpressionType.Constant) throw new Exception(CoreErrorStrings.Not_Implemented_Expression_ParameterUseConstant(exp,exp.Arguments[0]));
                         if (exp.Arguments.Count == 1) return ExpressionLambdaToSql(exp.Arguments[0], tsc);
                         var expArgsHack = exp.Arguments.Count == 2 && exp.Arguments[1].NodeType == ExpressionType.NewArrayInit ?
                             (exp.Arguments[1] as NewArrayExpression).Expressions : exp.Arguments.Where((a, z) => z > 0);
@@ -360,10 +331,11 @@ namespace FreeSql.ClickHouse
                     case "StartsWith":
                     case "EndsWith":
                     case "Contains":
+                        var leftLike = exp.Object.NodeType == ExpressionType.MemberAccess ? left : $"({left})";
                         var args0Value = getExp(exp.Arguments[0]);
-                        if (args0Value == "NULL") return $"({left}) IS NULL";
+                        if (args0Value == "NULL") return $"{leftLike} IS NULL";
                         if (exp.Method.Name == "StartsWith") return $"positionCaseInsensitive({left}, {args0Value}) = 1";
-                        if (exp.Method.Name == "EndsWith") return $"({left}) LIKE {(args0Value.StartsWith("'") ? args0Value.Insert(1, "%") : $"concat('%', {args0Value})")}";
+                        if (exp.Method.Name == "EndsWith") return $"{leftLike} LIKE {(args0Value.StartsWith("'") ? args0Value.Insert(1, "%") : $"concat('%', {args0Value})")}";
                         return $"positionCaseInsensitive({left}, {args0Value}) > 0";
                     case "ToLower": return $"lower({left})";
                     case "ToUpper": return $"upper({left})";
@@ -449,6 +421,19 @@ namespace FreeSql.ClickHouse
             }
             return null;
         }
+        public override string ExpressionLambdaToSqlCallDateDiff(string memberName, Expression date1, Expression date2, ExpTSC tsc)
+        {
+            Func<Expression, string> getExp = exparg => ExpressionLambdaToSql(exparg, tsc);
+            switch (memberName)
+            {
+                case "TotalDays": return $"dateDiff(day,{getExp(date2)},toDateTime({getExp(date1)}))";
+                case "TotalHours": return $"dateDiff(hour,{getExp(date2)},toDateTime({getExp(date1)}))";
+                case "TotalMilliseconds": return $"dateDiff(millisecond, {getExp(date2)},toDateTime({getExp(date1)}))";
+                case "TotalMinutes": return $"dateDiff(minute,{getExp(date2)},toDateTime({getExp(date1)}))";
+                case "TotalSeconds": return $"dateDiff(second,{getExp(date2)},toDateTime({getExp(date1)}))";
+            }
+            return null;
+        }
         public override string ExpressionLambdaToSqlCallDateTime(MethodCallExpression exp, ExpTSC tsc)
         {
             Func<Expression, string> getExp = exparg => ExpressionLambdaToSql(exparg, tsc);
@@ -477,7 +462,6 @@ namespace FreeSql.ClickHouse
                 var args1 = exp.Arguments.Count == 0 ? null : getExp(exp.Arguments[0]);
                 switch (exp.Method.Name)
                 {
-                    case "Add": return $"addSeconds(toDateTime({left}), {args1})";
                     case "AddDays": return $"addDays(toDateTime({left}), {args1})";
                     case "AddHours": return $"addHours(toDateTime({left}), {args1})";
                     case "AddMilliseconds": return $"addSeconds(toDateTime({left}), {args1}/1000)";
@@ -490,7 +474,6 @@ namespace FreeSql.ClickHouse
                         switch ((exp.Arguments[0].Type.IsNullableType() ? exp.Arguments[0].Type.GetGenericArguments().FirstOrDefault() : exp.Arguments[0].Type).FullName)
                         {
                             case "System.DateTime": return $"dateDiff(second, {args1}, toDateTime({left}))";
-                            case "System.TimeSpan": return $"addSeconds(toDateTime({left}),(({args1})*-1))";
                         }
                         break;
                     case "Equals": return $"({left} = {args1})";
@@ -555,42 +538,6 @@ namespace FreeSql.ClickHouse
             }
             return null;
         }
-        public override string ExpressionLambdaToSqlCallTimeSpan(MethodCallExpression exp, ExpTSC tsc)
-        {
-            Func<Expression, string> getExp = exparg => ExpressionLambdaToSql(exparg, tsc);
-            if (exp.Object == null)
-            {
-                switch (exp.Method.Name)
-                {
-                    case "Compare": return $"({getExp(exp.Arguments[0])}-({getExp(exp.Arguments[1])}))";
-                    case "Equals": return $"({getExp(exp.Arguments[0])} = {getExp(exp.Arguments[1])})";
-                    case "FromDays": return $"(({getExp(exp.Arguments[0])})*{(long)1000000 * 60 * 60 * 24})";
-                    case "FromHours": return $"(({getExp(exp.Arguments[0])})*{(long)1000000 * 60 * 60})";
-                    case "FromMilliseconds": return $"(({getExp(exp.Arguments[0])})*1000)";
-                    case "FromMinutes": return $"(({getExp(exp.Arguments[0])})*{(long)1000000 * 60})";
-                    case "FromSeconds": return $"(({getExp(exp.Arguments[0])})*1000000)";
-                    case "FromTicks": return $"(({getExp(exp.Arguments[0])})/10)";
-                    case "Parse": return $"cast({getExp(exp.Arguments[0])} as Int64)";
-                    case "ParseExact":
-                    case "TryParse":
-                    case "TryParseExact": return $"cast({getExp(exp.Arguments[0])} as Int64)";
-                }
-            }
-            else
-            {
-                var left = getExp(exp.Object);
-                var args1 = exp.Arguments.Count == 0 ? null : getExp(exp.Arguments[0]);
-                switch (exp.Method.Name)
-                {
-                    case "Add": return $"({left}+{args1})";
-                    case "Subtract": return $"({left}-({args1}))";
-                    case "Equals": return $"({left} = {args1})";
-                    case "CompareTo": return $"({left}-({args1}))";
-                    case "ToString": return $"cast({left} as String)";
-                }
-            }
-            return null;
-        }
         public override string ExpressionLambdaToSqlCallConvert(MethodCallExpression exp, ExpTSC tsc)
         {
             Func<Expression, string> getExp = exparg => ExpressionLambdaToSql(exparg, tsc);
@@ -604,14 +551,14 @@ namespace FreeSql.ClickHouse
                     case "ToDateTime": return ExpressionConstDateTime(exp.Arguments[0]) ?? $"cast({getExp(exp.Arguments[0])} as DateTime)";
                     case "ToDecimal": return $"cast({getExp(exp.Arguments[0])} as Decimal128(19))";
                     case "ToDouble": return $"cast({getExp(exp.Arguments[0])} as Float64)";
-                    case "ToInt16":
-                    case "ToInt32":
-                    case "ToInt64":
+                    case "ToInt16": return $"cast({getExp(exp.Arguments[0])} as Int16)";
+                    case "ToInt32": return $"cast({getExp(exp.Arguments[0])} as Int32)";
+                    case "ToInt64": return $"cast({getExp(exp.Arguments[0])} as Int64)";
                     case "ToSByte": return $"cast({getExp(exp.Arguments[0])} as UInt8)";
                     case "ToSingle": return $"cast({getExp(exp.Arguments[0])} as Float32)";
                     case "ToString": return $"cast({getExp(exp.Arguments[0])} as String)";
-                    case "ToUInt16":
-                    case "ToUInt32":
+                    case "ToUInt16": return $"cast({getExp(exp.Arguments[0])} as UInt16)";
+                    case "ToUInt32": return $"cast({getExp(exp.Arguments[0])} as UInt32)";
                     case "ToUInt64": return $"cast({getExp(exp.Arguments[0])} as UInt64)";
                 }
             }

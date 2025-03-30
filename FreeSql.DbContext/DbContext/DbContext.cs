@@ -12,12 +12,12 @@ namespace FreeSql
     public abstract partial class DbContext : IDisposable
     {
         internal DbContextScopedFreeSql _ormScoped;
-        internal IFreeSql OrmOriginal => _ormScoped?._originalFsql ?? throw new ArgumentNullException(DbContextStrings.ConfigureUseFreeSql);
+        internal IFreeSql OrmOriginal => _ormScoped?._originalFsql ?? throw new ArgumentNullException(DbContextErrorStrings.ConfigureUseFreeSql);
 
         /// <summary>
         /// 该对象 Select/Delete/Insert/Update/InsertOrUpdate 与 DbContext 事务保持一致，可省略传递 WithTransaction
         /// </summary>
-        public IFreeSql Orm => _ormScoped ?? throw new ArgumentNullException(DbContextStrings.ConfigureUseFreeSql);
+        public IFreeSql Orm => _ormScoped ?? throw new ArgumentNullException(DbContextErrorStrings.ConfigureUseFreeSql);
 
         #region Property UnitOfWork
         internal bool _isUseUnitOfWork = true; //是否创建工作单元事务
@@ -135,7 +135,7 @@ namespace FreeSql
         void CheckEntityTypeOrThrow(Type entityType)
         {
             if (OrmOriginal.CodeFirst.GetTableByEntity(entityType) == null)
-                throw new ArgumentException(DbContextStrings.ParameterDataTypeError(entityType.FullName));
+                throw new ArgumentException(DbContextErrorStrings.ParameterDataTypeError(entityType.FullName));
         }
         /// <summary>
         /// 添加
@@ -182,20 +182,6 @@ namespace FreeSql
         {
             CheckEntityTypeOrThrow(typeof(TEntity));
             this.Set<TEntity>().AddOrUpdate(data);
-        }
-        /// <summary>
-        /// 保存实体的指定 ManyToMany/OneToMany 导航属性（完整对比）<para></para>
-        /// 场景：在关闭级联保存功能之后，手工使用本方法<para></para>
-        /// 例子：保存商品的 OneToMany 集合属性，SaveMany(goods, "Skus")<para></para>
-        /// 当 goods.Skus 为空(非null)时，会删除表中已存在的所有数据<para></para>
-        /// 当 goods.Skus 不为空(非null)时，添加/更新后，删除表中不存在 Skus 集合属性的所有记录
-        /// </summary>
-        /// <param name="data">实体对象</param>
-        /// <param name="propertyName">属性名</param>
-        public void SaveMany<TEntity>(TEntity data, string propertyName) where TEntity : class
-        {
-            CheckEntityTypeOrThrow(typeof(TEntity));
-            this.Set<TEntity>().SaveMany(data, propertyName);
         }
 
         /// <summary>
@@ -252,11 +238,6 @@ namespace FreeSql
         {
             CheckEntityTypeOrThrow(typeof(TEntity));
             return this.Set<TEntity>().AddOrUpdateAsync(data, cancellationToken);
-        }
-        public Task SaveManyAsync<TEntity>(TEntity data, string propertyName, CancellationToken cancellationToken = default) where TEntity : class
-        {
-            CheckEntityTypeOrThrow(typeof(TEntity));
-            return this.Set<TEntity>().SaveManyAsync(data, propertyName, cancellationToken);
         }
 #endif
         #endregion

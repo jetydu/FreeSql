@@ -21,7 +21,7 @@ namespace FreeSql.Extensions.EntityUtil
 
         static ConcurrentDictionary<DataType, ConcurrentDictionary<Type, Func<object, bool, string>>> _dicGetEntityKeyString = new ConcurrentDictionary<DataType, ConcurrentDictionary<Type, Func<object, bool, string>>>();
         /// <summary>
-        /// 获取实体的主键值，以 "*|_,[,_|*" 分割，当任意一个主键属性无值时，返回 null
+        /// 获取实体的主键值，以 "*|_,[,_|*" 分割，当任意一个主键属性无值时，返回 ""
         /// </summary>
         /// <param name="orm"></param>
         /// <param name="entityType"></param>
@@ -45,6 +45,10 @@ namespace FreeSql.Extensions.EntityUtil
                 var var3IsNull = Expression.Variable(typeof(bool));
                 var exps = new List<Expression>(new Expression[] {
                     Expression.Assign(var1Parm, Expression.TypeAs(parm1, t)),
+                    Expression.IfThen(
+                        Expression.Equal(var1Parm, Expression.Constant(null, t)),
+                        Expression.Return(returnTarget, Expression.Default(typeof(string)))
+                    ),
                     Expression.Assign(var2Sb, Expression.New(typeof(StringBuilder))),
                     Expression.Assign(var3IsNull, Expression.Constant(false))
                 });
@@ -249,9 +253,9 @@ namespace FreeSql.Extensions.EntityUtil
                         )
                     });
                     exps.AddRange(new Expression[] {
-                    Expression.Return(returnTarget, var2Ret),
-                    Expression.Label(returnTarget, Expression.Default(typeof(object)))
-                });
+                        Expression.Return(returnTarget, var2Ret),
+                        Expression.Label(returnTarget, Expression.Default(typeof(object)))
+                    });
                     return Expression.Lambda<Func<object, object>>(Expression.Block(new[] { var1Parm, var2Ret }, exps), new[] { parm1 }).Compile();
                 });
             return func(entity);

@@ -33,7 +33,7 @@ namespace FreeSql.Odbc.PostgreSQL
                 { typeof(decimal).FullName, CsToDb.New(OdbcType.Numeric, "numeric", "numeric(10,2) NOT NULL", false, false, 0) },{ typeof(decimal?).FullName, CsToDb.New(OdbcType.Numeric, "numeric", "numeric(10,2)", false, true, null) },
 
                 { typeof(string).FullName, CsToDb.New(OdbcType.VarChar, "varchar", "varchar(255)", false, null, "") },
-                { typeof(char).FullName, CsToDb.New(OdbcType.Char, "char", "char(1) NULL", false, null, '\0') },
+                { typeof(char).FullName, CsToDb.New(OdbcType.Char, "bpchar", "bpchar(1) NULL", false, null, '\0') },
 
                 { typeof(TimeSpan).FullName, CsToDb.New(OdbcType.Time, "time","time NOT NULL", false, false, 0) },{ typeof(TimeSpan?).FullName, CsToDb.New(OdbcType.Time, "time", "time",false, true, null) },
                 { typeof(DateTime).FullName, CsToDb.New(OdbcType.DateTime, "timestamp", "timestamp NOT NULL", false, false, new DateTime(1970,1,1)) },{ typeof(DateTime?).FullName, CsToDb.New(OdbcType.DateTime, "timestamp", "timestamp", false, true, null) },
@@ -85,21 +85,16 @@ namespace FreeSql.Odbc.PostgreSQL
             var sb = new StringBuilder();
             var seqcols = new List<NativeTuple<ColumnInfo, string[], bool>>(); //序列
 
-            var isPg95 = true;
-            var isPg96 = true;
             var isPg10 = (_orm.DbFirst as OdbcPostgreSQLDbFirst).IsPg10;
-            using (var conn = _orm.Ado.MasterPool.Get(TimeSpan.FromSeconds(5)))
-            {
-                isPg95 = OdbcPostgreSQLDbFirst.ParsePgVersion(conn.Value.ServerVersion, 9, 5).Item1;
-                isPg96 = OdbcPostgreSQLDbFirst.ParsePgVersion(conn.Value.ServerVersion, 9, 6).Item1;
-            }
+            var isPg95 = (_orm.DbFirst as OdbcPostgreSQLDbFirst).IsPg95;
+            var isPg96 = (_orm.DbFirst as OdbcPostgreSQLDbFirst).IsPg96;
 
             foreach (var obj in objects)
             {
                 if (sb.Length > 0) sb.Append("\r\n");
                 var tb = obj.tableSchema;
-                if (tb == null) throw new Exception(CoreStrings.S_Type_IsNot_Migrable(obj.tableSchema.Type.FullName));
-                if (tb.Columns.Any() == false) throw new Exception(CoreStrings.S_Type_IsNot_Migrable_0Attributes(obj.tableSchema.Type.FullName));
+                if (tb == null) throw new Exception(CoreErrorStrings.S_Type_IsNot_Migrable(obj.tableSchema.Type.FullName));
+                if (tb.Columns.Any() == false) throw new Exception(CoreErrorStrings.S_Type_IsNot_Migrable_0Attributes(obj.tableSchema.Type.FullName));
                 var tbname = _commonUtils.SplitTableName(tb.DbName);
                 if (tbname?.Length == 1) tbname = new[] { "public", tbname[0] };
 
@@ -392,7 +387,8 @@ where pg_namespace.nspname={0} and pg_class.relname={1} and pg_constraint.contyp
                     sb.Append("ALTER TABLE ").Append(_commonUtils.QuoteSqlName($"{tbname[0]}.{tbname[1]}")).Append(" DROP CONSTRAINT ").Append(oldpk).Append(";\r\n");
 
                 //创建临时表，数据导进临时表，然后删除原表，将临时表改名为原表名
-                var tablename = tboldname == null ? _commonUtils.QuoteSqlName($"{tbname[0]}.{tbname[1]}") : _commonUtils.QuoteSqlName($"{tboldname[0]}.{tboldname[1]}");
+                var newtablename = _commonUtils.QuoteSqlName($"{tbname[0]}.{tbname[1]}");
+                var tablename = tboldname == null ? newtablename : _commonUtils.QuoteSqlName($"{tboldname[0]}.{tboldname[1]}");
                 var tmptablename = _commonUtils.QuoteSqlName($"{tbname[0]}.FreeSqlTmp_{tbname[1]}");
                 //创建临时表
                 sb.Append("CREATE TABLE IF NOT EXISTS ").Append(tmptablename).Append(" ( ");
@@ -454,7 +450,7 @@ where pg_namespace.nspname={0} and pg_class.relname={1} and pg_constraint.contyp
                     if (uk.IsUnique) sb.Append("UNIQUE ");
                     sb.Append("INDEX ");
                     if (isPg95) sb.Append("IF NOT EXISTS ");
-                    sb.Append(_commonUtils.QuoteSqlName(ReplaceIndexName(uk.Name, tbname[1]))).Append(" ON ").Append(tablename).Append("(");
+                    sb.Append(_commonUtils.QuoteSqlName(ReplaceIndexName(uk.Name, tbname[1]))).Append(" ON ").Append(newtablename).Append("(");
                     foreach (var tbcol in uk.Columns)
                     {
                         sb.Append(_commonUtils.QuoteSqlName(tbcol.Column.Attribute.Name));
@@ -469,7 +465,7 @@ where pg_namespace.nspname={0} and pg_class.relname={1} and pg_constraint.contyp
                     {
                         if (tbcol.Attribute.IsIdentity)
                         {
-                            var maxval = _orm.Ado.QuerySingle<int>($"select max({_commonUtils.QuoteSqlName(tbcol.Attribute.Name)}) from {tablename}");
+                            var maxval = _orm.Ado.QuerySingle<int>($"select max({_commonUtils.QuoteSqlName(tbcol.Attribute.Name)}) from {newtablename}");
                             if (maxval > 0)
                             {
                                 sb.Append("ALTER TABLE ").Append(_commonUtils.QuoteSqlName($"{tbname[0]}.{tbname[1]}")).Append(" ALTER COLUMN ").Append(_commonUtils.QuoteSqlName(tbcol.Attribute.Name)).Append(" SET GENERATED BY DEFAULT");

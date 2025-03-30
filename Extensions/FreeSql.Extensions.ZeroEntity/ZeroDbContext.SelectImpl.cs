@@ -571,7 +571,7 @@ namespace FreeSql.Extensions.ZeroEntity
 				var ta = _tableAlias.Where(a => string.Join(".", a.NavPath) == navPath).FirstOrDefault();
 				if (ta?.Table.ColumnsByCs.TryGetValue(field.Last(), out var col) == true)
 					return NativeTuple.Create($"{ta.Alias}.{_common.QuoteSqlName(col.Attribute.Name)}", col);
-				throw new Exception(CoreStrings.Cannot_Match_Property(property));
+				throw new Exception(CoreErrorStrings.Cannot_Match_Property(property));
 			}
 
 			/// <summary>
@@ -581,7 +581,7 @@ namespace FreeSql.Extensions.ZeroEntity
 			{
 				var alias = _tableAlias.Where(a => a.Table == _tables[_mainTableIndex]).FirstOrDefault()?.Alias;
 				if (!string.IsNullOrWhiteSpace(alias)) alias = $"{alias}.";
-				var where = _common.WhereItems(_tables[_mainTableIndex].Primarys, alias, items);
+				var where = _common.WhereItems(_tables[_mainTableIndex].Primarys, alias, items, _selectProvider._params);
 				_select.Where(where);
 				return this;
 			}
@@ -750,7 +750,6 @@ namespace FreeSql.Extensions.ZeroEntity
 					case DataType.OdbcOracle:
 					case DataType.CustomOracle:
 					case DataType.Dameng:
-					case DataType.OdbcDameng:
 					case DataType.GBase:
 						query.Limit(-1);
 						break;

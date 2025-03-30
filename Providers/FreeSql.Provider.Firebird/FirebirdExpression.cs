@@ -222,35 +222,6 @@ namespace FreeSql.Firebird
             }
             return null;
         }
-        public override string ExpressionLambdaToSqlMemberAccessTimeSpan(MemberExpression exp, ExpTSC tsc)
-        {
-            if (exp.Expression == null)
-            {
-                switch (exp.Member.Name)
-                {
-                    case "Zero": return "0";
-                    case "MinValue": return "-922337203685.477580"; //秒 Ticks / 1000,000,0
-                    case "MaxValue": return "922337203685.477580";
-                }
-                return null;
-            }
-            var left = ExpressionLambdaToSql(exp.Expression, tsc);
-            switch (exp.Member.Name)
-            {
-                case "Days": return $"floor(({left})/{60 * 60 * 24})";
-                case "Hours": return $"mod(({left})/{60 * 60},24)";
-                case "Milliseconds": return $"(cast({left} as bigint)*1000)";
-                case "Minutes": return $"mod(({left})/60,60)";
-                case "Seconds": return $"mod({left},60)";
-                case "Ticks": return $"(cast({left} as bigint)*10000000)";
-                case "TotalDays": return $"(({left})/{60 * 60 * 24})";
-                case "TotalHours": return $"(({left})/{60 * 60})";
-                case "TotalMilliseconds": return $"(cast({left} as bigint)*1000)";
-                case "TotalMinutes": return $"(({left})/60)";
-                case "TotalSeconds": return $"({left})";
-            }
-            return null;
-        }
 
         public override string ExpressionLambdaToSqlCallString(MethodCallExpression exp, ExpTSC tsc)
         {
@@ -270,7 +241,7 @@ namespace FreeSql.Firebird
                             return _common.StringConcat(concatNewArrExp.Expressions.Select(a => getExp(a)).ToArray(), null);
                         return _common.StringConcat(exp.Arguments.Select(a => getExp(a)).ToArray(), null);
                     case "Format":
-                        if (exp.Arguments[0].NodeType != ExpressionType.Constant) throw new Exception(CoreStrings.Not_Implemented_Expression_ParameterUseConstant(exp,exp.Arguments[0]));
+                        if (exp.Arguments[0].NodeType != ExpressionType.Constant) throw new Exception(CoreErrorStrings.Not_Implemented_Expression_ParameterUseConstant(exp,exp.Arguments[0]));
                         var expArgsHack = exp.Arguments.Count == 2 && exp.Arguments[1].NodeType == ExpressionType.NewArrayInit ?
                             (exp.Arguments[1] as NewArrayExpression).Expressions : exp.Arguments.Where((a, z) => z > 0);
                         //3个 {} 时，Arguments 解析出来是分开的
@@ -301,18 +272,19 @@ namespace FreeSql.Firebird
                     case "StartsWith":
                     case "EndsWith":
                     case "Contains":
+                        var leftLike = exp.Object.NodeType == ExpressionType.MemberAccess ? left : $"({left})";
                         var args0Value = getExp(exp.Arguments[0]);
-                        if (args0Value == "NULL") return $"({left}) IS NULL";
+                        if (args0Value == "NULL") return $"{leftLike} IS NULL";
                         if (args0Value.Contains("%"))
                         {
                             if (exp.Method.Name == "StartsWith") return $"position({args0Value}, {left}) = 1";
-                            if (exp.Method.Name == "EndsWith") return $"position({args0Value}, {left}) = char_length({args0Value})";
+                            if (exp.Method.Name == "EndsWith") return $"position({args0Value}, {left}) = char_length({left})-char_length({args0Value})+1";
                             return $"position({args0Value}, {left}) > 0";
                         }
-                        if (exp.Method.Name == "StartsWith") return $"({left}) LIKE {(args0Value.EndsWith("'") ? args0Value.Insert(args0Value.Length - 1, "%") : $"({args0Value})||'%'")}";
-                        if (exp.Method.Name == "EndsWith") return $"({left}) LIKE {(args0Value.StartsWith("'") ? args0Value.Insert(1, "%") : $"'%'||({args0Value})")}";
-                        if (args0Value.StartsWith("'") && args0Value.EndsWith("'")) return $"({left}) CONTAINING {args0Value}";
-                        return $"({left}) CONTAINING ({args0Value})";
+                        if (exp.Method.Name == "StartsWith") return $"{leftLike} LIKE {(args0Value.EndsWith("'") ? args0Value.Insert(args0Value.Length - 1, "%") : $"({args0Value})||'%'")}";
+                        if (exp.Method.Name == "EndsWith") return $"{leftLike} LIKE {(args0Value.StartsWith("'") ? args0Value.Insert(1, "%") : $"'%'||({args0Value})")}";
+                        if (args0Value.StartsWith("'") && args0Value.EndsWith("'")) return $"{leftLike} CONTAINING {args0Value}";
+                        return $"{leftLike} CONTAINING ({args0Value})";
                     case "ToLower": return $"lower({left})";
                     case "ToUpper": return $"upper({left})";
                     case "Substring":
@@ -397,6 +369,19 @@ namespace FreeSql.Firebird
             }
             return null;
         }
+        public override string ExpressionLambdaToSqlCallDateDiff(string memberName, Expression date1, Expression date2, ExpTSC tsc)
+        {
+            Func<Expression, string> getExp = exparg => ExpressionLambdaToSql(exparg, tsc);
+            switch (memberName)
+            {
+                case "TotalDays": return $"datediff(day from {getExp(date2)} to {getExp(date1)})";
+                case "TotalHours": return $"datediff(hour from {getExp(date2)} to {getExp(date1)})";
+                case "TotalMilliseconds": return $"datediff(millisecond from {getExp(date2)} to {getExp(date1)})";
+                case "TotalMinutes": return $"datediff(minute from {getExp(date2)} to {getExp(date1)})";
+                case "TotalSeconds": return $"datediff(second from {getExp(date2)} to {getExp(date1)})";
+            }
+            return null;
+        }
         public override string ExpressionLambdaToSqlCallDateTime(MethodCallExpression exp, ExpTSC tsc)
         {
             Func<Expression, string> getExp = exparg => ExpressionLambdaToSql(exparg, tsc);
@@ -424,7 +409,6 @@ namespace FreeSql.Firebird
                 var args1 = exp.Arguments.Count == 0 ? null : getExp(exp.Arguments[0]);
                 switch (exp.Method.Name)
                 {
-                    case "Add": return $"dateadd({args1} second to {left})";
                     case "AddDays": return $"dateadd({args1} day to {left})";
                     case "AddHours": return $"dateadd({args1} hour to {left})";
                     case "AddMilliseconds": return $"dateadd(({args1})/1000 second to {left})";
@@ -437,7 +421,6 @@ namespace FreeSql.Firebird
                         switch ((exp.Arguments[0].Type.IsNullableType() ? exp.Arguments[0].Type.GetGenericArguments().FirstOrDefault() : exp.Arguments[0].Type).FullName)
                         {
                             case "System.DateTime": return $"datediff(second from {left} to {args1})";
-                            case "System.TimeSpan": return $"dateadd(({args1})*-1 second to {left})";
                         }
                         break;
                     case "Equals": return $"({left} = {args1})";
@@ -477,42 +460,6 @@ namespace FreeSql.Firebird
                             return m.Groups[0].Value;
                         });
                         return isMatched == false ? args1 : $"({args1})";
-                }
-            }
-            return null;
-        }
-        public override string ExpressionLambdaToSqlCallTimeSpan(MethodCallExpression exp, ExpTSC tsc)
-        {
-            Func<Expression, string> getExp = exparg => ExpressionLambdaToSql(exparg, tsc);
-            if (exp.Object == null)
-            {
-                switch (exp.Method.Name)
-                {
-                    case "Compare": return $"({getExp(exp.Arguments[0])}-({getExp(exp.Arguments[1])}))";
-                    case "Equals": return $"({getExp(exp.Arguments[0])} = {getExp(exp.Arguments[1])})";
-                    case "FromDays": return $"(({getExp(exp.Arguments[0])})*{60 * 60 * 24})";
-                    case "FromHours": return $"(({getExp(exp.Arguments[0])})*{60 * 60})";
-                    case "FromMilliseconds": return $"(({getExp(exp.Arguments[0])})/1000)";
-                    case "FromMinutes": return $"(({getExp(exp.Arguments[0])})*60)";
-                    case "FromSeconds": return $"(({getExp(exp.Arguments[0])}))";
-                    case "FromTicks": return $"(({getExp(exp.Arguments[0])})/10000000)";
-                    case "Parse": return $"cast({getExp(exp.Arguments[0])} as bigint)";
-                    case "ParseExact":
-                    case "TryParse":
-                    case "TryParseExact": return $"cast({getExp(exp.Arguments[0])} as bigint)";
-                }
-            }
-            else
-            {
-                var left = getExp(exp.Object);
-                var args1 = exp.Arguments.Count == 0 ? null : getExp(exp.Arguments[0]);
-                switch (exp.Method.Name)
-                {
-                    case "Add": return $"({left}+{args1})";
-                    case "Subtract": return $"({left}-({args1}))";
-                    case "Equals": return $"({left} = {args1})";
-                    case "CompareTo": return $"({left}-({args1}))";
-                    case "ToString": return $"cast({left} as varchar(50))";
                 }
             }
             return null;

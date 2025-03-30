@@ -170,7 +170,7 @@ namespace FreeSql
         /// <param name="navigatePropertyName">Navigation property name</param>
         public virtual void SaveMany(string navigatePropertyName)
         {
-            if (Repository == null) 
+            if (Repository == null)
                 Repository = Orm.GetRepository<TEntity>();
             Repository.UnitOfWork = _resolveUow?.Invoke();
             Repository.SaveMany(this as TEntity, navigatePropertyName);

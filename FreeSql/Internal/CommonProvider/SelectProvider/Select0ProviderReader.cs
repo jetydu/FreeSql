@@ -21,13 +21,13 @@ namespace FreeSql.Internal.CommonProvider
     {
         public DataTable ToDataTableByPropertyName(string[] properties)
         {
-            if (properties?.Any() != true) throw new ArgumentException($"{CoreStrings.Properties_Cannot_Null}");
+            if (properties?.Any() != true) throw new ArgumentException($"{CoreErrorStrings.Properties_Cannot_Null}");
             var sbfield = new StringBuilder();
             for (var propIdx = 0; propIdx < properties.Length; propIdx++)
             {
                 var property = properties[propIdx];
                 var exp = ConvertStringPropertyToExpression(property);
-                if (exp == null) throw new Exception(CoreStrings.Property_Cannot_Find(property));
+                if (exp == null) throw new Exception(CoreErrorStrings.Property_Cannot_Find(property));
                 var field = _commonExpression.ExpressionSelectColumn_MemberAccess(_tables, _tableRule, null, SelectTableInfoType.From, exp, true, _diymemexpWithTempQuery);
                 if (propIdx > 0) sbfield.Append(", ");
                 sbfield.Append(field);
@@ -236,7 +236,7 @@ namespace FreeSql.Internal.CommonProvider
         }
         public void ToChunk(int size, Action<FetchCallbackArgs<List<T1>>> done, bool includeNestedMembers = false)
         {
-            if (_selectExpression != null) throw new ArgumentException(CoreStrings.Before_Chunk_Cannot_Use_Select);
+            if (_selectExpression != null) throw new ArgumentException(CoreErrorStrings.Before_Chunk_Cannot_Use_Select);
             this.ToListChunkPrivate(size, done, includeNestedMembers == false ? this.GetAllFieldExpressionTreeLevel2() : this.GetAllFieldExpressionTreeLevelAll(), null);
         }
 
@@ -851,6 +851,21 @@ namespace FreeSql.Internal.CommonProvider
             this.GroupBy(sql.Length > 0 ? sql.Substring(2) : null);
             return new SelectGroupingProvider<TKey, TValue>(_orm, this, map, sql, _commonExpression, _tables);
         }
+        bool _groupBySelfFlag = false;
+        public TSelect InternalGroupBySelf(Expression column)
+        {
+            _groupBySelfFlag = true;
+            if (column.NodeType == ExpressionType.Lambda) column = (column as LambdaExpression)?.Body;
+            switch (column?.NodeType)
+            {
+                case ExpressionType.New:
+                    var newExp = column as NewExpression;
+                    if (newExp == null) break;
+                    this.GroupBy(string.Join(", ", newExp.Members.Select((b, a) => _commonExpression.ExpressionSelectColumn_MemberAccess(_tables, _tableRule, null, SelectTableInfoType.From, newExp.Arguments[a], true, _diymemexpWithTempQuery))));
+                    return this as TSelect;
+            }
+            return this.GroupBy(_commonExpression.ExpressionSelectColumn_MemberAccess(_tables, _tableRule, null, SelectTableInfoType.From, column, true, _diymemexpWithTempQuery));
+        }
         public TSelect InternalJoin(Expression exp, SelectTableInfoType joinType)
         {
             _commonExpression.ExpressionJoinLambda(_tables, _tableRule, joinType, exp, _diymemexpWithTempQuery, _whereGlobalFilter);
@@ -859,7 +874,7 @@ namespace FreeSql.Internal.CommonProvider
         protected TSelect InternalJoin<T2>(Expression exp, SelectTableInfoType joinType)
         {
             var tb = _commonUtils.GetTableByEntity(typeof(T2));
-            if (tb == null) throw new ArgumentException(CoreStrings.T2_Type_Error);
+            if (tb == null) throw new ArgumentException(CoreErrorStrings.T2_Type_Error);
             _tables.Add(new SelectTableInfo { Table = tb, Alias = $"IJ{_tables.Count}", On = null, Type = joinType });
             _commonExpression.ExpressionJoinLambda(_tables, _tableRule, joinType, exp, _diymemexpWithTempQuery, _whereGlobalFilter);
             return this as TSelect;
@@ -990,7 +1005,7 @@ namespace FreeSql.Internal.CommonProvider
         protected string InternalGetInsertIntoToSql<TTargetEntity>(string tableName, Expression select)
         {
             var tb = _orm.CodeFirst.GetTableByEntity(typeof(TTargetEntity));
-            if (tb == null) throw new ArgumentException(CoreStrings.InsertInto_TypeError(typeof(TTargetEntity).DisplayCsharp()));
+            if (tb == null) throw new ArgumentException(CoreErrorStrings.InsertInto_TypeError(typeof(TTargetEntity).DisplayCsharp()));
             if (string.IsNullOrEmpty(tableName)) tableName = tb.DbName;
             if (_orm.CodeFirst.IsSyncStructureToLower) tableName = tableName.ToLower();
             if (_orm.CodeFirst.IsSyncStructureToUpper) tableName = tableName.ToUpper();
@@ -1003,7 +1018,7 @@ namespace FreeSql.Internal.CommonProvider
             _commonExpression.ReadAnonymousField(_tables, _tableRule, field, map, ref index, select, null, _diymemexpWithTempQuery, _whereGlobalFilter, null, null, false); //不走 DTO 映射，不处理 IncludeMany
             
             var childs = map.Childs;
-            if (childs.Any() == false) throw new ArgumentException(CoreStrings.InsertInto_No_Property_Selected(typeof(TTargetEntity).DisplayCsharp()));
+            if (childs.Any() == false) throw new ArgumentException(CoreErrorStrings.InsertInto_No_Property_Selected(typeof(TTargetEntity).DisplayCsharp()));
             foreach (var col in tb.Columns.Values)
             {
                 if (col.Attribute.IsIdentity && string.IsNullOrEmpty(col.DbInsertValue)) continue;
@@ -1101,13 +1116,13 @@ namespace FreeSql.Internal.CommonProvider
 #else
         public Task<DataTable> ToDataTableByPropertyNameAsync(string[] properties, CancellationToken cancellationToken)
         {
-            if (properties?.Any() != true) throw new ArgumentException($"{CoreStrings.Properties_Cannot_Null}");
+            if (properties?.Any() != true) throw new ArgumentException($"{CoreErrorStrings.Properties_Cannot_Null}");
             var sbfield = new StringBuilder();
             for (var propIdx = 0; propIdx < properties.Length; propIdx++)
             {
                 var property = properties[propIdx];
                 var exp = ConvertStringPropertyToExpression(property);
-                if (exp == null) throw new Exception(CoreStrings.Property_Cannot_Find(property));
+                if (exp == null) throw new Exception(CoreErrorStrings.Property_Cannot_Find(property));
                 var field = _commonExpression.ExpressionSelectColumn_MemberAccess(_tables, _tableRule, null, SelectTableInfoType.From, exp, true, _diymemexpWithTempQuery);
                 if (propIdx > 0) sbfield.Append(", ");
                 sbfield.Append(field);
@@ -1247,6 +1262,148 @@ namespace FreeSql.Internal.CommonProvider
             if (SameSelectPending(ref sql, csspsod)) return Task.FromResult(new List<T1>());
             return ToListAfPrivateAsync(sql, af, otherData, cancellationToken);
         }
+        #region ToChunkAsync
+        async internal Task ToListAfChunkPrivateAsync(int chunkSize, Func<FetchCallbackArgs<List<T1>>, Task> chunkDone, string sql, GetAllFieldExpressionTreeInfo af, ReadAnonymousTypeOtherInfo[] otherData, CancellationToken cancellationToken)
+        {
+            if (_cancel?.Invoke() == true) return;
+            var dbParms = _params.ToArray();
+            var before = new Aop.CurdBeforeEventArgs(_tables[0].Table.Type, _tables[0].Table, Aop.CurdType.Select, sql, dbParms);
+            _orm.Aop.CurdBeforeHandler?.Invoke(this, before);
+            var ret = new FetchCallbackArgs<List<T1>> { Object = new List<T1>() };
+            var retCount = 0;
+            Exception exception = null;
+            var checkDoneTimes = 0;
+            try
+            {
+                await _orm.Ado.ExecuteReaderAsync(_connection, _transaction, async fetch =>
+                {
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        fetch.IsBreak = true;
+                        return;
+                    }
+                    ret.Object.Add(af.Read(_orm, fetch.Object));
+                    if (otherData != null)
+                    {
+                        var idx = af.FieldCount - 1;
+                        foreach (var other in otherData)
+                            other.retlist.Add(_commonExpression.ReadAnonymous(other.read, fetch.Object, ref idx, false, null, ret.Object.Count - 1, null, null));
+                    }
+                    retCount++;
+                    if (chunkSize > 0 && chunkSize == ret.Object.Count)
+                    {
+                        checkDoneTimes++;
+
+                        foreach (var include in _includeToListAsync) await include?.Invoke(ret.Object, cancellationToken);
+                        _trackToList?.Invoke(ret.Object);
+                        await chunkDone(ret);
+                        fetch.IsBreak = ret.IsBreak;
+
+                        ret.Object.Clear();
+                        if (otherData != null)
+                            foreach (var other in otherData)
+                                other.retlist.Clear();
+                    }
+                }, CommandType.Text, sql, _commandTimeout, dbParms, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                exception = ex;
+                throw;
+            }
+            finally
+            {
+                var after = new Aop.CurdAfterEventArgs(before, exception, retCount);
+                _orm.Aop.CurdAfterHandler?.Invoke(this, after);
+            }
+            if (ret.Object.Any() || checkDoneTimes == 0)
+            {
+                foreach (var include in _includeToListAsync) await include?.Invoke(ret.Object, cancellationToken);
+                _trackToList?.Invoke(ret.Object);
+                await chunkDone(ret);
+            }
+        }
+        internal Task ToListChunkPrivateAsync(int chunkSize, Func<FetchCallbackArgs<List<T1>>, Task> chunkDone, GetAllFieldExpressionTreeInfo af, ReadAnonymousTypeOtherInfo[] otherData, CancellationToken cancellationToken)
+        {
+            string sql = null;
+            if (otherData?.Length > 0)
+            {
+                var sbField = new StringBuilder().Append(af.Field);
+                foreach (var other in otherData)
+                    sbField.Append(other.field);
+                sql = this.ToSql(sbField.ToString().TrimStart(','));
+            }
+            else
+                sql = this.ToSql(af.Field);
+
+            return ToListAfChunkPrivateAsync(chunkSize, chunkDone, sql, af, otherData, cancellationToken);
+        }
+        public Task ToChunkAsync(int size, Func<FetchCallbackArgs<List<T1>>, Task> done, bool includeNestedMembers = false, CancellationToken cancellationToken = default)
+        {
+            if (_selectExpression != null) throw new ArgumentException(CoreErrorStrings.Before_Chunk_Cannot_Use_Select);
+            return this.ToListChunkPrivateAsync(size, done, includeNestedMembers == false ? this.GetAllFieldExpressionTreeLevel2() : this.GetAllFieldExpressionTreeLevelAll(), null, cancellationToken);
+        }
+
+        async internal Task ToListMrChunkPrivateAsync<TReturn>(int chunkSize, Func<FetchCallbackArgs<List<TReturn>>, Task> chunkDone, string sql, ReadAnonymousTypeAfInfo af, CancellationToken cancellationToken)
+        {
+            if (_cancel?.Invoke() == true) return;
+            var type = typeof(TReturn);
+            var dbParms = _params.ToArray();
+            var before = new Aop.CurdBeforeEventArgs(_tables[0].Table.Type, _tables[0].Table, Aop.CurdType.Select, sql, dbParms);
+            _orm.Aop.CurdBeforeHandler?.Invoke(this, before);
+            var ret = new FetchCallbackArgs<List<TReturn>> { Object = new List<TReturn>() };
+            var retCount = 0;
+            Exception exception = null;
+            var checkDoneTimes = 0;
+            try
+            {
+                await _orm.Ado.ExecuteReaderAsync(_connection, _transaction, async fetch =>
+                {
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        fetch.IsBreak = true;
+                        return;
+                    }
+                    var index = -1;
+                    ret.Object.Add((TReturn)_commonExpression.ReadAnonymous(af.map, fetch.Object, ref index, false, null, ret.Object.Count, af.fillIncludeMany, af.fillSubSelectMany));
+                    retCount++;
+                    if (chunkSize > 0 && chunkSize == ret.Object.Count)
+                    {
+                        checkDoneTimes++;
+
+                        foreach (var include in _includeToListAsync) await include?.Invoke(ret.Object, cancellationToken);
+                        _trackToList?.Invoke(ret.Object);
+                        await chunkDone(ret);
+                        fetch.IsBreak = ret.IsBreak;
+
+                        ret.Object.Clear();
+                    }
+                }, CommandType.Text, sql, _commandTimeout, dbParms, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                exception = ex;
+                throw;
+            }
+            finally
+            {
+                var after = new Aop.CurdAfterEventArgs(before, exception, retCount);
+                _orm.Aop.CurdAfterHandler?.Invoke(this, after);
+            }
+            if (ret.Object.Any() || checkDoneTimes == 0)
+            {
+                foreach (var include in _includeToListAsync) await include?.Invoke(ret.Object, cancellationToken);
+                _trackToList?.Invoke(ret.Object);
+                await chunkDone(ret);
+            }
+        }
+        public Task InternalToChunkAsync<TReturn>(Expression select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken)
+        {
+            var af = this.GetExpressionField(select);
+            var sql = this.ToSql(af.field);
+            return this.ToListMrChunkPrivateAsync<TReturn>(size, done, sql, af, cancellationToken);
+        }
+        #endregion
 
         public Task<Dictionary<TKey, T1>> ToDictionaryAsync<TKey>(Func<T1, TKey> keySelector, CancellationToken cancellationToken) => ToDictionaryAsync(keySelector, a => a, cancellationToken);
         async public Task<Dictionary<TKey, TElement>> ToDictionaryAsync<TKey, TElement>(Func<T1, TKey> keySelector, Func<T1, TElement> elementSelector, CancellationToken cancellationToken)

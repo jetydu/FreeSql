@@ -17,21 +17,14 @@ namespace FreeSql
         internal RepositoryDbSet<TEntity> _dbsetPriv;
         internal RepositoryDbSet<TEntity> _dbset => _dbsetPriv ?? (_dbsetPriv = _db.Set<TEntity>() as RepositoryDbSet<TEntity>);
 
-        public IDataFilter<TEntity> DataFilter { get; } = new DataFilter<TEntity>();
         internal Func<Type, string, string> _asTablePriv;
 
-        protected void ApplyDataFilter(string name, Expression<Func<TEntity, bool>> exp) => DataFilter.Apply(name, exp);
-
-        protected BaseRepository(IFreeSql fsql, Expression<Func<TEntity, bool>> filter, Func<string, string> asTable = null)
+        protected BaseRepository(IFreeSql fsql)
         {
             _ormScoped = DbContextScopedFreeSql.Create(fsql, () => _db, () => UnitOfWork);
-            DataFilterUtil.SetRepositoryDataFilter(this, null);
-            DataFilter.Apply("", filter);
-            AsTable(asTable);
-
             fsql?.GlobalFilter?.GetAllFilters().ForEach(gf =>
             {
-                (DataFilter as DataFilter<TEntity>)._filtersByOrm.TryAdd(gf.Name, new DataFilter<TEntity>.FilterItemByOrm
+                DataFilter._filtersByOrm.TryAdd(gf.Name, new RepositoryDataFilter.FilterItemByOrm
                 {
                     Filter = gf,
                     IsEnabled = true
@@ -48,7 +41,6 @@ namespace FreeSql
             {
                 _dbsetPriv?.Dispose();
                 _dbPriv?.Dispose();
-                this.DataFilter?.Dispose();
             }
             finally
             {
@@ -71,6 +63,7 @@ namespace FreeSql
 			_asTablePriv = rule;
 		}
 		public DbContextOptions DbContextOptions { get => _db.Options; set => _db.Options = value; }
+        public RepositoryDataFilter DataFilter { get; set; } = new RepositoryDataFilter();
 
         internal DbContextScopedFreeSql _ormScoped;
         internal IFreeSql OrmOriginal => _ormScoped?._originalFsql;
@@ -199,17 +192,17 @@ namespace FreeSql
     public abstract partial class BaseRepository<TEntity, TKey> : BaseRepository<TEntity>, IBaseRepository<TEntity, TKey>
         where TEntity : class
     {
-        public BaseRepository(IFreeSql fsql, Expression<Func<TEntity, bool>> filter, Func<string, string> asTable = null) : base(fsql, filter, asTable) { }
+        public BaseRepository(IFreeSql fsql) : base(fsql) { }
 
         TEntity CheckTKeyAndReturnIdEntity(TKey id)
         {
             var tb = _db.OrmOriginal.CodeFirst.GetTableByEntity(EntityType);
-            if (tb.Primarys.Length != 1) throw new Exception(DbContextStrings.EntityType_PrimaryKeyIsNotOne(EntityType.Name));
-            if (tb.Primarys[0].CsType.NullableTypeOrThis() != typeof(TKey).NullableTypeOrThis()) throw new Exception(DbContextStrings.EntityType_PrimaryKeyError(EntityType.Name, typeof(TKey).FullName));
+            if (tb.Primarys.Length != 1) throw new Exception(DbContextErrorStrings.EntityType_PrimaryKeyIsNotOne(EntityType.Name));
+            if (tb.Primarys[0].CsType.NullableTypeOrThis() != typeof(TKey).NullableTypeOrThis()) throw new Exception(DbContextErrorStrings.EntityType_PrimaryKeyError(EntityType.Name, typeof(TKey).FullName));
             var obj = tb.Type.CreateInstanceGetDefaultValue();
             _db.OrmOriginal.SetEntityValueWithPropertyName(tb.Type, obj, tb.Primarys[0].CsName, id);
             var ret = obj as TEntity;
-            if (ret == null) throw new Exception(DbContextStrings.EntityType_CannotConvert(EntityType.Name, typeof(TEntity).Name));
+            if (ret == null) throw new Exception(DbContextErrorStrings.EntityType_CannotConvert(EntityType.Name, typeof(TEntity).Name));
             return ret;
         }
 

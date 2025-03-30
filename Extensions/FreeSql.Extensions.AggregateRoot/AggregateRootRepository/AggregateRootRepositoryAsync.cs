@@ -53,7 +53,7 @@ namespace FreeSql
             bool LocalCanInsert(Type entityType, object entity, bool isadd)
             {
                 var stateKey = rootRepository.Orm.GetEntityKeyString(entityType, entity, false);
-                if (stateKey == null) return true;
+                if (string.IsNullOrEmpty(stateKey)) return true;
                 if (ignores.TryGetValue(entityType, out var stateKeys) == false)
                 {
                     if (isadd)
@@ -154,7 +154,7 @@ namespace FreeSql
             var stateKey = Orm.GetEntityKeyString(EntityType, entity, false);
             if (entity == null) throw new ArgumentNullException(nameof(entity));
             var table = Orm.CodeFirst.GetTableByEntity(EntityType);
-            if (table.Primarys.Any() == false) throw new Exception(DbContextStrings.CannotAdd_EntityHasNo_PrimaryKey(Orm.GetEntityString(EntityType, entity)));
+            if (table.Primarys.Any() == false) throw new Exception(DbContextErrorStrings.CannotAdd_EntityHasNo_PrimaryKey(Orm.GetEntityString(EntityType, entity)));
 
             var flagExists = ExistsInStates(entity);
             if (flagExists == false)
@@ -210,6 +210,7 @@ namespace FreeSql
             var affrows = 0;
             for (var a = tracking.DeleteLog.Count - 1; a >= 0; a--)
 			{
+                if (tracking.DeleteLog[a].Item2.Any() == false) continue;
 				var delete = Orm.Delete<object>().AsType(tracking.DeleteLog[a].Item1);
 				if (_asTableRule != null) delete.AsTable(old => _asTableRule(tracking.DeleteLog[a].Item1, old));
 				affrows += await delete.WhereDynamic(tracking.DeleteLog[a].Item2).ExecuteAffrowsAsync(cancellationToken);
@@ -235,7 +236,6 @@ namespace FreeSql
             Attach(entity); //应该只存储 propertyName 内容
         }
 
-
         async Task<int> SaveTrackingChangeAsync(AggregateRootTrackingChangeInfo tracking, CancellationToken cancellationToken)
         {
             var affrows = 0;
@@ -251,6 +251,7 @@ namespace FreeSql
 
             for (var a = tracking.DeleteLog.Count - 1; a >= 0; a--)
 			{
+                if (tracking.DeleteLog[a].Item2.Any() == false) continue;
 				var delete = Orm.Delete<object>().AsType(tracking.DeleteLog[a].Item1);
 				if (_asTableRule != null) delete.AsTable(old => _asTableRule(tracking.DeleteLog[a].Item1, old));
 				affrows += await delete.WhereDynamic(tracking.DeleteLog[a].Item2).ExecuteAffrowsAsync(cancellationToken);

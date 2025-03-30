@@ -197,7 +197,7 @@ namespace FreeSql.Internal.CommonProvider
         public string InternalToSql(string field)
         {
             if (string.IsNullOrEmpty(field))
-                throw new ArgumentException(CoreStrings.Parameter_Field_NotSpecified);
+                throw new ArgumentException(CoreErrorStrings.Parameter_Field_NotSpecified);
 
             var isNestedPageSql = false;
             switch (_orm.Ado.DataType)
@@ -205,8 +205,7 @@ namespace FreeSql.Internal.CommonProvider
                 case DataType.Oracle:
                 case DataType.OdbcOracle:
                 case DataType.CustomOracle:
-                case DataType.Dameng:
-                case DataType.OdbcDameng: //Oracle、Dameng 分组时，嵌套分页
+                case DataType.Dameng: //Oracle、Dameng 分组时，嵌套分页
                 case DataType.GBase:
                     isNestedPageSql = true;
                     break;
@@ -250,7 +249,7 @@ namespace FreeSql.Internal.CommonProvider
             ret._transaction = _select._transaction;
             ret._whereGlobalFilter = new List<GlobalFilter.Item>(_select._whereGlobalFilter.ToArray());
             ret._cancel = _select._cancel;
-            ret._params.AddRange(_select._params);
+            //ret._params.AddRange(_select._params); //#1965 WithTempQueryParser 子查询参数化，押后添加参数
             if (ret._tables[0].Table == null) ret._tables[0].Table = TableInfo.GetDefaultTable(typeof(TDto));
             Select0Provider.WithTempQueryParser parser = null;
             _addFieldAlias = true; //解决：[Column(Name = "flevel") 与属性名不一致时，嵌套查询 bug
@@ -276,6 +275,7 @@ namespace FreeSql.Internal.CommonProvider
             var sql = $"\r\n{this.ToSql(parser._insideSelectList[0].InsideField)}";
             ret.WithSql(sql);
             ret._diymemexpWithTempQuery = parser;
+            ret._params.AddRange(_select._params);
             return ret;
         }
 

@@ -4,7 +4,7 @@
 		<TargetFrameworks>netstandard2.1;netstandard2.0;net451;net45;net40</TargetFrameworks>
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<Authors>FreeSql;ncc;YeXiangQin</Authors>
-		<Description>FreeSql is the ORM in .NetCore, .NetFramework, And Xamarin. It supports Mysql, Postgresql, SqlServer, Oracle, Sqlite, Firebird, Clickhouse, QuestDB, Odbc, Oledb, 达梦, 人大金仓, 南大通用, 虚谷, 神舟通用, 翰高, And Access</Description>
+		<Description>FreeSql is the ORM in .NetCore, .NetFramework, And Xamarin. It supports Mysql, Postgresql, SqlServer, Oracle, Sqlite, Firebird, Clickhouse, DuckDB, TDengine, QuestDB, Odbc, Oledb, 达梦, 人大金仓, 南大通用, 虚谷, 神舟通用, 翰高, And Access</Description>
 		<PackageProjectUrl>https://github.com/2881099/FreeSql</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/2881099/FreeSql</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
@@ -17,7 +17,7 @@
 		<SignAssembly>true</SignAssembly>
 		<AssemblyOriginatorKeyFile>key.snk</AssemblyOriginatorKeyFile>
 		<DelaySign>false</DelaySign>
-		<Version>3.2.813-preview20240208</Version>
+		<Version>3.5.200</Version>
 		<PackageReadmeFile>readme.md</PackageReadmeFile>
 	</PropertyGroup>
 
@@ -25,28 +25,9 @@
 		<None Include="../readme.md" Pack="true" PackagePath="\" />
 		<None Include="../logo.png" Pack="true" PackagePath="\" />
 	</ItemGroup>
-	<ItemGroup>
-		<Compile Remove="Properties\Resources.cs" />
-	</ItemGroup>
-	<ItemGroup>
-		<None Remove="Properties\Resources.tt" />
-	</ItemGroup>
 
 	<ItemGroup>
 		<Service Include="{508349b6-6b84-4df5-91f0-309beebad82d}" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<Compile Update="Internal\CommonProvider\SelectProvider\Select1Provider2`16.cs">
-			<DependentUpon>Select1Provider2`16.tt</DependentUpon>
-			<DesignTime>True</DesignTime>
-			<AutoGen>True</AutoGen>
-		</Compile>
-		<Compile Update="Properties\CoreStrings.Designer.cs">
-			<DesignTime>True</DesignTime>
-			<AutoGen>True</AutoGen>
-			<DependentUpon>CoreStrings.Designer.tt</DependentUpon>
-		</Compile>
 	</ItemGroup>
 
 	<ItemGroup>
@@ -58,13 +39,6 @@
 			<Generator>TextTemplatingFileGenerator</Generator>
 			<LastGenOutput>Select1Provider2`16.cs</LastGenOutput>
 		</None>
-		<None Update="Properties\CoreStrings.Designer.tt">
-			<Generator>TextTemplatingFileGenerator</Generator>
-			<LastGenOutput>CoreStrings.Designer.cs</LastGenOutput>
-		</None>
-		<EmbeddedResource Update="Properties\CoreStrings.resx">
-			<CustomToolNamespace>FreeSql</CustomToolNamespace>
-		</EmbeddedResource>
 	</ItemGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

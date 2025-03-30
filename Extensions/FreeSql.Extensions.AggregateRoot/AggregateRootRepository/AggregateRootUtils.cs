@@ -81,6 +81,7 @@ namespace FreeSql
                     if (table.ColumnsByCs.ContainsKey(col.CsName))
                     {
                         if (col.Attribute.IsVersion) continue;
+                        if (col.Attribute.CanUpdate == false) continue;
                         var propvalBefore = table.GetPropertyValue(entityBefore, col.CsName);
                         var propvalAfter = table.GetPropertyValue(entityAfter, col.CsName);
                         //if (object.Equals(propvalBefore, propvalAfter) == false) changes.Add(col.CsName);
@@ -146,20 +147,24 @@ namespace FreeSql
                     //}
                     return;
                 }
+                var table = fsql.CodeFirst.GetTableByEntity(elementType);
                 Dictionary<string, object> dictBefore = new Dictionary<string, object>();
                 Dictionary<string, object> dictAfter = new Dictionary<string, object>();
                 foreach (var item in collectionBefore)
                 {
                     var key = fsql.GetEntityKeyString(elementType, item, false);
-                    if (key != null) dictBefore.Add(key, item);
+                    if (!string.IsNullOrEmpty(key)) dictBefore.Add(key, item);
                 }
                 foreach (var item in collectionAfter)
                 {
                     var key = fsql.GetEntityKeyString(elementType, item, false);
-                    if (key != null)
+                    if (!string.IsNullOrEmpty(key))
                     {
-                        if (dictAfter.ContainsKey(key) == false) 
+                        if (dictAfter.ContainsKey(key) == false)
                             dictAfter.Add(key, item);
+                        else if (key == "0" && table.Primarys.Length == 1 && 
+                            new[] { typeof(long), typeof(int) }.Contains(table.Primarys[0].CsType))
+                            tracking.InsertLog.Add(NativeTuple.Create(elementType, item));
                     }
                     else tracking.InsertLog.Add(NativeTuple.Create(elementType, item));
                 }
@@ -352,6 +357,7 @@ namespace FreeSql
 
         public static void MapEntityValue(string boundaryName, IFreeSql fsql, Type rootEntityType, object rootEntityFrom, object rootEntityTo)
         {
+            var isDict = rootEntityTo?.GetType() == typeof(Dictionary<string, object>);
             Dictionary<Type, Dictionary<string, bool>> ignores = new Dictionary<Type, Dictionary<string, bool>>();
             LocalMapEntityValue(rootEntityType, rootEntityFrom, rootEntityTo, true);
             ignores.Clear();
@@ -359,7 +365,7 @@ namespace FreeSql
             void LocalMapEntityValue(Type entityType, object entityFrom, object entityTo, bool cascade)
             {
                 if (entityFrom == null || entityTo == null) return;
-                if (entityType == null) entityType = entityFrom?.GetType() ?? entityTo?.GetType();
+                if (entityType == null) entityType = entityFrom.GetType();
                 var table = fsql.CodeFirst.GetTableByEntity(entityType);
                 if (table == null) return;
 
@@ -373,7 +379,8 @@ namespace FreeSql
                     if (table.ColumnsByCsIgnore.ContainsKey(prop.Name)) continue;
                     if (table.ColumnsByCs.ContainsKey(prop.Name))
                     {
-                        table.SetPropertyValue(entityTo, prop.Name, table.GetPropertyValue(entityFrom, prop.Name));
+                        if (isDict) (entityTo as Dictionary<string, object>)[prop.Name] = table.GetPropertyValue(entityFrom, prop.Name);
+                        else table.SetPropertyValue(entityTo, prop.Name, table.GetPropertyValue(entityFrom, prop.Name));
                         continue;
                     }
                     if (cascade == false) continue;
@@ -384,16 +391,18 @@ namespace FreeSql
                     var propvalFrom = EntityUtilExtensions.GetEntityValueWithPropertyName(fsql, entityType, entityFrom, prop.Name);
                     if (propvalFrom == null)
                     {
-                        EntityUtilExtensions.SetEntityValueWithPropertyName(fsql, entityType, entityTo, prop.Name, null);
+                        if (isDict) (entityTo as Dictionary<string, object>)[prop.Name] = null;
+                        else EntityUtilExtensions.SetEntityValueWithPropertyName(fsql, entityType, entityTo, prop.Name, null);
                         continue;
                     }
                     switch (tbref.RefType)
                     {
                         case TableRefType.OneToOne:
-                            var propvalTo = tbref.RefEntityType.CreateInstanceGetDefaultValue();
+                            var propvalTo = isDict ? new Dictionary<string, object>() : tbref.RefEntityType.CreateInstanceGetDefaultValue();
                             SetNavigateRelationshipValue(fsql, tbref, table.Type, entityFrom, propvalFrom);
                             LocalMapEntityValue(tbref.RefEntityType, propvalFrom, propvalTo, boundaryAttr?.BreakThen != true);
-                            EntityUtilExtensions.SetEntityValueWithPropertyName(fsql, entityType, entityTo, prop.Name, propvalTo);
+                            if (isDict) (entityTo as Dictionary<string, object>)[prop.Name] = null;
+                            else EntityUtilExtensions.SetEntityValueWithPropertyName(fsql, entityType, entityTo, prop.Name, propvalTo);
                             break;
                         case TableRefType.OneToMany:
                             SetNavigateRelationshipValue(fsql, tbref, table.Type, entityFrom, propvalFrom);
@@ -410,22 +419,36 @@ namespace FreeSql
             }
             void LocalMapEntityValueCollection(Type entityType, object entityFrom, object entityTo, TableRef tbref, IEnumerable propvalFrom, PropertyInfo prop, bool cascade)
             {
-                var propvalTo = typeof(List<>).MakeGenericType(tbref.RefEntityType).CreateInstanceGetDefaultValue();
-                var propvalToIList = propvalTo as IList;
-                foreach (var fromItem in propvalFrom)
+                if (isDict)
                 {
-                    var toItem = tbref.RefEntityType.CreateInstanceGetDefaultValue();
-                    LocalMapEntityValue(tbref.RefEntityType, fromItem, toItem, cascade);
-                    propvalToIList.Add(toItem);
+                    var propvalTo = new List<Dictionary<string,object>>();
+                    foreach (var fromItem in propvalFrom)
+                    {
+                        var toItem = new Dictionary<string, object>();
+                        LocalMapEntityValue(tbref.RefEntityType, fromItem, toItem, cascade);
+                        propvalTo.Add(toItem);
+                    }
+                    (entityTo as Dictionary<string, object>)[prop.Name] = propvalTo;
                 }
-                var propvalType = prop.PropertyType.GetGenericTypeDefinition();
-                if (propvalType == typeof(List<>) || propvalType == typeof(ICollection<>))
-                    EntityUtilExtensions.SetEntityValueWithPropertyName(fsql, entityType, entityTo, prop.Name, propvalTo);
-                else if (propvalType == typeof(ObservableCollection<>))
+                else
                 {
-                    //var propvalTypeOcCtor = typeof(ObservableCollection<>).MakeGenericType(tbref.RefEntityType).GetConstructor(new[] { typeof(List<>).MakeGenericType(tbref.RefEntityType) });
-                    var propvalTypeOc = Activator.CreateInstance(typeof(ObservableCollection<>).MakeGenericType(tbref.RefEntityType), new object[] { propvalTo });
-                    EntityUtilExtensions.SetEntityValueWithPropertyName(fsql, entityType, entityTo, prop.Name, propvalTypeOc);
+                    var propvalTo = typeof(List<>).MakeGenericType(tbref.RefEntityType).CreateInstanceGetDefaultValue();
+                    var propvalToIList = propvalTo as IList;
+                    foreach (var fromItem in propvalFrom)
+                    {
+                        var toItem = tbref.RefEntityType.CreateInstanceGetDefaultValue();
+                        LocalMapEntityValue(tbref.RefEntityType, fromItem, toItem, cascade);
+                        propvalToIList.Add(toItem);
+                    }
+                    var propvalType = prop.PropertyType.GetGenericTypeDefinition();
+                    if (propvalType == typeof(List<>) || propvalType == typeof(ICollection<>))
+                        EntityUtilExtensions.SetEntityValueWithPropertyName(fsql, entityType, entityTo, prop.Name, propvalTo);
+                    else if (propvalType == typeof(ObservableCollection<>))
+                    {
+                        //var propvalTypeOcCtor = typeof(ObservableCollection<>).MakeGenericType(tbref.RefEntityType).GetConstructor(new[] { typeof(List<>).MakeGenericType(tbref.RefEntityType) });
+                        var propvalTypeOc = Activator.CreateInstance(typeof(ObservableCollection<>).MakeGenericType(tbref.RefEntityType), new object[] { propvalTo });
+                        EntityUtilExtensions.SetEntityValueWithPropertyName(fsql, entityType, entityTo, prop.Name, propvalTypeOc);
+                    }
                 }
             }
         }
@@ -495,7 +518,7 @@ namespace FreeSql
                 void LocalInclude(TableRef tbref, Expression exp)
                 {
                     var incMethod = queryExp.Type.GetMethod("Include");
-                    if (incMethod == null) throw new Exception(CoreStrings.RunTimeError_Reflection_IncludeMany.Replace("IncludeMany", "Include"));
+                    if (incMethod == null) throw new Exception(CoreErrorStrings.RunTimeError_Reflection_IncludeMany.Replace("IncludeMany", "Include"));
                     queryExp = Expression.Call(queryExp, incMethod.MakeGenericMethod(tbref.RefEntityType),
                         Expression.Lambda(typeof(Func<,>).MakeGenericType(entityType, tbref.RefEntityType), exp, navigateParameterExp));
                 }
@@ -504,7 +527,7 @@ namespace FreeSql
                     var funcType = typeof(Func<,>).MakeGenericType(entityType, typeof(IEnumerable<>).MakeGenericType(tbref.RefEntityType));
                     var navigateSelector = Expression.Lambda(funcType, exp, navigateParameterExp);
                     var incMethod = queryExp.Type.GetMethod("IncludeMany");
-                    if (incMethod == null) throw new Exception(CoreStrings.RunTimeError_Reflection_IncludeMany);
+                    if (incMethod == null) throw new Exception(CoreErrorStrings.RunTimeError_Reflection_IncludeMany);
                     LambdaExpression navigateThen = null;
                     var navigateThenType = typeof(Action<>).MakeGenericType(typeof(ISelect<>).MakeGenericType(tbref.RefEntityType));
                     var thenParameter = Expression.Parameter(typeof(ISelect<>).MakeGenericType(tbref.RefEntityType), "then");

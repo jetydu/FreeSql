@@ -38,6 +38,7 @@ namespace FreeSql.SqlServer
                 { typeof(DateTime).FullName, CsToDb.New(SqlDbType.DateTime, "datetime", "datetime NOT NULL", false, false, new DateTime(1970,1,1)) },{ typeof(DateTime?).FullName, CsToDb.New(SqlDbType.DateTime, "datetime", "datetime", false, true, null) },
                 { typeof(DateTimeOffset).FullName, CsToDb.New(SqlDbType.DateTimeOffset, "datetimeoffset", "datetimeoffset NOT NULL", false, false, new DateTimeOffset(new DateTime(1970,1,1), TimeSpan.Zero)) },{ typeof(DateTimeOffset?).FullName, CsToDb.New(SqlDbType.DateTimeOffset, "datetimeoffset", "datetimeoffset", false, true, null) },
 #if net60
+                { typeof(TimeOnly).FullName, CsToDb.New(SqlDbType.Time, "time", "time NOT NULL", false, false, TimeOnly.MinValue) },{ typeof(TimeOnly?).FullName, CsToDb.New(SqlDbType.Time, "time", "time", false, true, null) },
                 { typeof(DateOnly).FullName, CsToDb.New(SqlDbType.Date, "date", "date NOT NULL", false, false, new DateTime(1970,1,1)) },{ typeof(DateOnly?).FullName, CsToDb.New(SqlDbType.Date, "date", "date", false, true, null) },
 #endif
 
@@ -152,8 +153,8 @@ ELSE
                 {
                     if (sb.Length > 0) sb.Append("\r\n");
                     var tb = obj.tableSchema;
-                    if (tb == null) throw new Exception(CoreStrings.S_Type_IsNot_Migrable(obj.tableSchema.Type.FullName));
-                    if (tb.Columns.Any() == false) throw new Exception(CoreStrings.S_Type_IsNot_Migrable_0Attributes(obj.tableSchema.Type.FullName));
+                    if (tb == null) throw new Exception(CoreErrorStrings.S_Type_IsNot_Migrable(obj.tableSchema.Type.FullName));
+                    if (tb.Columns.Any() == false) throw new Exception(CoreErrorStrings.S_Type_IsNot_Migrable_0Attributes(obj.tableSchema.Type.FullName));
                     var tbname = _commonUtils.SplitTableName(tb.DbName);
                     if (tbname?.Length == 1) tbname = new[] { database, "dbo", tbname[0] };
                     if (tbname?.Length == 2) tbname = new[] { database, tbname[0], tbname[1] };
@@ -364,7 +365,8 @@ use [" + database + "];", tboldname ?? tbname);
                     }
                     //创建临时表，数据导进临时表，然后删除原表，将临时表改名为原表名
                     bool idents = false;
-                    var tablename = tboldname == null ? _commonUtils.QuoteSqlName(tbname[0], tbname[1], tbname[2]) : _commonUtils.QuoteSqlName(tboldname[0], tboldname[1], tboldname[2]);
+                    var newtablename = _commonUtils.QuoteSqlName(tbname[0], tbname[1], tbname[2]);
+                    var tablename = tboldname == null ? newtablename : _commonUtils.QuoteSqlName(tboldname[0], tboldname[1], tboldname[2]);
                     var tmptablename = _commonUtils.QuoteSqlName(tbname[0], tbname[1], $"FreeSqlTmp_{tbname[2]}");
                     sb.Append("BEGIN TRANSACTION\r\n")
                         .Append("SET QUOTED_IDENTIFIER ON\r\n")
@@ -441,7 +443,7 @@ use [" + database + "];", tboldname ?? tbname);
                     {
                         sb.Append("CREATE ");
                         if (uk.IsUnique) sb.Append("UNIQUE ");
-                        sb.Append("INDEX ").Append(_commonUtils.QuoteSqlName(ReplaceIndexName(uk.Name, tbname[2]))).Append(" ON ").Append(tablename).Append("(");
+                        sb.Append("INDEX ").Append(_commonUtils.QuoteSqlName(ReplaceIndexName(uk.Name, tbname[2]))).Append(" ON ").Append(newtablename).Append("(");
                         foreach (var tbcol in uk.Columns)
                         {
                             sb.Append(_commonUtils.QuoteSqlName(tbcol.Column.Attribute.Name));

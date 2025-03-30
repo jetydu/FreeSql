@@ -24,7 +24,7 @@ namespace FreeSql.Custom.MySql
                 MasterPool = pool;
                 return;
             }
-            throw new Exception(CoreStrings.S_CustomAdapter_OnlySuppport_UseConnectionFactory);
+            throw new Exception(CoreErrorStrings.S_CustomAdapter_OnlySuppport_UseConnectionFactory);
         }
         public override object AddslashesProcessParam(object param, Type mapType, ColumnInfo mapColumn)
         {
@@ -49,7 +49,10 @@ namespace FreeSql.Custom.MySql
                 return AddslashesTypeHandler(typeof(DateTime?), param) ?? string.Concat("'", ((DateTime)param).ToString("yyyy-MM-dd HH:mm:ss.fff"), "'");
 
             else if (param is TimeSpan || param is TimeSpan?)
-                return ((TimeSpan)param).Ticks / 10;
+            {
+                var ts = (TimeSpan)param;
+                return $"'{Math.Floor(ts.TotalHours)}:{ts.Minutes}:{ts.Seconds}'";
+            }
             else if (param is byte[])
                 return $"0x{CommonUtils.BytesSqlRaw(param as byte[])}";
             else if (param is IEnumerable)

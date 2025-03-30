@@ -29,14 +29,14 @@ namespace FreeSql.MsAccess
             if (isAdoPool) masterConnectionString = masterConnectionString.Substring("AdoConnectionPool,".Length);
             if (!string.IsNullOrEmpty(masterConnectionString))
                 MasterPool = isAdoPool ?
-                    new DbConnectionStringPool(base.DataType, CoreStrings.S_MasterDatabase, () => new OleDbConnection(masterConnectionString)) as IObjectPool<DbConnection> :
-                    new MsAccessConnectionPool(CoreStrings.S_MasterDatabase, masterConnectionString, null, null);
+                    new DbConnectionStringPool(base.DataType, CoreErrorStrings.S_MasterDatabase, () => new OleDbConnection(masterConnectionString)) as IObjectPool<DbConnection> :
+                    new MsAccessConnectionPool(CoreErrorStrings.S_MasterDatabase, masterConnectionString, null, null);
 
             slaveConnectionStrings?.ToList().ForEach(slaveConnectionString =>
             {
                 var slavePool = isAdoPool ?
-                        new DbConnectionStringPool(base.DataType, $"{CoreStrings.S_SlaveDatabase}{SlavePools.Count + 1}", () => new OleDbConnection(slaveConnectionString)) as IObjectPool<DbConnection> :
-                        new MsAccessConnectionPool($"{CoreStrings.S_SlaveDatabase}{SlavePools.Count + 1}", slaveConnectionString, () => Interlocked.Decrement(ref slaveUnavailables), () => Interlocked.Increment(ref slaveUnavailables));
+                    new DbConnectionStringPool(base.DataType, $"{CoreErrorStrings.S_SlaveDatabase}{SlavePools.Count + 1}", () => new OleDbConnection(slaveConnectionString)) as IObjectPool<DbConnection> :
+                    new MsAccessConnectionPool($"{CoreErrorStrings.S_SlaveDatabase}{SlavePools.Count + 1}", slaveConnectionString, () => Interlocked.Decrement(ref slaveUnavailables), () => Interlocked.Increment(ref slaveUnavailables));
                 SlavePools.Add(slavePool);
             });
         }
@@ -74,7 +74,10 @@ namespace FreeSql.MsAccess
             }
 
             else if (param is TimeSpan || param is TimeSpan?)
-                return ((TimeSpan)param).TotalSeconds;
+            {
+                var ts = (TimeSpan)param;
+                return $"'{ts.Hours}:{ts.Minutes}:{ts.Seconds}'";
+            }
             else if (param is byte[])
                 return $"0x{CommonUtils.BytesSqlRaw(param as byte[])}";
             else if (param is IEnumerable)

@@ -27,6 +27,7 @@ namespace FreeSql
         Task<DataTable> ToDataTableAsync<TReturn>(Expression<Func<T1, T2, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<T1, T2, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TDto>> ToListAsync<TDto>(CancellationToken cancellationToken = default);
+        Task ToChunkAsync<TReturn>(Expression<Func<T1, T2, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default);
 
         Task<TReturn> ToOneAsync<TReturn>(Expression<Func<T1, T2, TReturn>> select, CancellationToken cancellationToken = default);
         Task<TReturn> FirstAsync<TReturn>(Expression<Func<T1, T2, TReturn>> select, CancellationToken cancellationToken = default);
@@ -44,6 +45,7 @@ namespace FreeSql
         Task<int> InsertIntoAsync<TTargetEntity>(string tableName, Expression<Func<HzyTuple<T1, T2>, TTargetEntity>> select, CancellationToken cancellationToken = default) where TTargetEntity : class;
         Task<DataTable> ToDataTableAsync<TReturn>(Expression<Func<HzyTuple<T1, T2>, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<HzyTuple<T1, T2>, TReturn>> select, CancellationToken cancellationToken = default);
+        Task ToChunkAsync<TReturn>(Expression<Func<HzyTuple<T1, T2>, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default);
 
         Task<TReturn> ToOneAsync<TReturn>(Expression<Func<HzyTuple<T1, T2>, TReturn>> select, CancellationToken cancellationToken = default);
         Task<TReturn> FirstAsync<TReturn>(Expression<Func<HzyTuple<T1, T2>, TReturn>> select, CancellationToken cancellationToken = default);
@@ -77,6 +79,7 @@ namespace FreeSql
         double Avg<TMember>(Expression<Func<T1, T2, TMember>> column);
 
         ISelect<T1, T2> LeftJoin(Expression<Func<T1, T2, bool>> exp);
+        ISelect<T1, T2> Join(Expression<Func<T1, T2, bool>> exp);
         ISelect<T1, T2> InnerJoin(Expression<Func<T1, T2, bool>> exp);
         ISelect<T1, T2> RightJoin(Expression<Func<T1, T2, bool>> exp);
 
@@ -84,6 +87,7 @@ namespace FreeSql
         ISelect<T1, T2> WhereIf(bool condition, Expression<Func<T1, T2, bool>> exp);
 
         ISelectGrouping<TKey, NativeTuple<T1, T2>> GroupBy<TKey>(Expression<Func<T1, T2, TKey>> exp);
+        ISelect<T1, T2> GroupBySelf<TMember>(Expression<Func<T1, T2, TMember>> column);
 
         ISelect<T1, T2> OrderBy<TMember>(Expression<Func<T1, T2, TMember>> column);
         ISelect<T1, T2> OrderByDescending<TMember>(Expression<Func<T1, T2, TMember>> column);
@@ -112,6 +116,7 @@ namespace FreeSql
         double Avg<TMember>(Expression<Func<HzyTuple<T1, T2>, TMember>> column);
 
         ISelect<T1, T2> LeftJoin(Expression<Func<HzyTuple<T1, T2>, bool>> exp);
+        ISelect<T1, T2> Join(Expression<Func<HzyTuple<T1, T2>, bool>> exp);
         ISelect<T1, T2> InnerJoin(Expression<Func<HzyTuple<T1, T2>, bool>> exp);
         ISelect<T1, T2> RightJoin(Expression<Func<HzyTuple<T1, T2>, bool>> exp);
 
@@ -119,6 +124,7 @@ namespace FreeSql
         ISelect<T1, T2> WhereIf(bool condition, Expression<Func<HzyTuple<T1, T2>, bool>> exp);
 
         ISelectGrouping<TKey, NativeTuple<T1, T2>> GroupBy<TKey>(Expression<Func<HzyTuple<T1, T2>, TKey>> exp);
+        ISelect<T1, T2> GroupBySelf<TMember>(Expression<Func<HzyTuple<T1, T2>, TMember>> column);
 
         ISelect<T1, T2> OrderBy<TMember>(Expression<Func<HzyTuple<T1, T2>, TMember>> column);
         ISelect<T1, T2> OrderByDescending<TMember>(Expression<Func<HzyTuple<T1, T2>, TMember>> column);
@@ -144,6 +150,7 @@ namespace FreeSql
         Task<DataTable> ToDataTableAsync<TReturn>(Expression<Func<T1, T2, T3, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<T1, T2, T3, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TDto>> ToListAsync<TDto>(CancellationToken cancellationToken = default);
+        Task ToChunkAsync<TReturn>(Expression<Func<T1, T2, T3, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default);
 
         Task<TReturn> ToOneAsync<TReturn>(Expression<Func<T1, T2, T3, TReturn>> select, CancellationToken cancellationToken = default);
         Task<TReturn> FirstAsync<TReturn>(Expression<Func<T1, T2, T3, TReturn>> select, CancellationToken cancellationToken = default);
@@ -161,6 +168,7 @@ namespace FreeSql
         Task<int> InsertIntoAsync<TTargetEntity>(string tableName, Expression<Func<HzyTuple<T1, T2, T3>, TTargetEntity>> select, CancellationToken cancellationToken = default) where TTargetEntity : class;
         Task<DataTable> ToDataTableAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3>, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3>, TReturn>> select, CancellationToken cancellationToken = default);
+        Task ToChunkAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3>, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default);
 
         Task<TReturn> ToOneAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3>, TReturn>> select, CancellationToken cancellationToken = default);
         Task<TReturn> FirstAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3>, TReturn>> select, CancellationToken cancellationToken = default);
@@ -194,6 +202,7 @@ namespace FreeSql
         double Avg<TMember>(Expression<Func<T1, T2, T3, TMember>> column);
 
         ISelect<T1, T2, T3> LeftJoin(Expression<Func<T1, T2, T3, bool>> exp);
+        ISelect<T1, T2, T3> Join(Expression<Func<T1, T2, T3, bool>> exp);
         ISelect<T1, T2, T3> InnerJoin(Expression<Func<T1, T2, T3, bool>> exp);
         ISelect<T1, T2, T3> RightJoin(Expression<Func<T1, T2, T3, bool>> exp);
 
@@ -201,6 +210,7 @@ namespace FreeSql
         ISelect<T1, T2, T3> WhereIf(bool condition, Expression<Func<T1, T2, T3, bool>> exp);
 
         ISelectGrouping<TKey, NativeTuple<T1, T2, T3>> GroupBy<TKey>(Expression<Func<T1, T2, T3, TKey>> exp);
+        ISelect<T1, T2, T3> GroupBySelf<TMember>(Expression<Func<T1, T2, T3, TMember>> column);
 
         ISelect<T1, T2, T3> OrderBy<TMember>(Expression<Func<T1, T2, T3, TMember>> column);
         ISelect<T1, T2, T3> OrderByDescending<TMember>(Expression<Func<T1, T2, T3, TMember>> column);
@@ -229,6 +239,7 @@ namespace FreeSql
         double Avg<TMember>(Expression<Func<HzyTuple<T1, T2, T3>, TMember>> column);
 
         ISelect<T1, T2, T3> LeftJoin(Expression<Func<HzyTuple<T1, T2, T3>, bool>> exp);
+        ISelect<T1, T2, T3> Join(Expression<Func<HzyTuple<T1, T2, T3>, bool>> exp);
         ISelect<T1, T2, T3> InnerJoin(Expression<Func<HzyTuple<T1, T2, T3>, bool>> exp);
         ISelect<T1, T2, T3> RightJoin(Expression<Func<HzyTuple<T1, T2, T3>, bool>> exp);
 
@@ -236,6 +247,7 @@ namespace FreeSql
         ISelect<T1, T2, T3> WhereIf(bool condition, Expression<Func<HzyTuple<T1, T2, T3>, bool>> exp);
 
         ISelectGrouping<TKey, NativeTuple<T1, T2, T3>> GroupBy<TKey>(Expression<Func<HzyTuple<T1, T2, T3>, TKey>> exp);
+        ISelect<T1, T2, T3> GroupBySelf<TMember>(Expression<Func<HzyTuple<T1, T2, T3>, TMember>> column);
 
         ISelect<T1, T2, T3> OrderBy<TMember>(Expression<Func<HzyTuple<T1, T2, T3>, TMember>> column);
         ISelect<T1, T2, T3> OrderByDescending<TMember>(Expression<Func<HzyTuple<T1, T2, T3>, TMember>> column);
@@ -261,6 +273,7 @@ namespace FreeSql
         Task<DataTable> ToDataTableAsync<TReturn>(Expression<Func<T1, T2, T3, T4, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<T1, T2, T3, T4, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TDto>> ToListAsync<TDto>(CancellationToken cancellationToken = default);
+        Task ToChunkAsync<TReturn>(Expression<Func<T1, T2, T3, T4, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default);
 
         Task<TReturn> ToOneAsync<TReturn>(Expression<Func<T1, T2, T3, T4, TReturn>> select, CancellationToken cancellationToken = default);
         Task<TReturn> FirstAsync<TReturn>(Expression<Func<T1, T2, T3, T4, TReturn>> select, CancellationToken cancellationToken = default);
@@ -278,6 +291,7 @@ namespace FreeSql
         Task<int> InsertIntoAsync<TTargetEntity>(string tableName, Expression<Func<HzyTuple<T1, T2, T3, T4>, TTargetEntity>> select, CancellationToken cancellationToken = default) where TTargetEntity : class;
         Task<DataTable> ToDataTableAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4>, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4>, TReturn>> select, CancellationToken cancellationToken = default);
+        Task ToChunkAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4>, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default);
 
         Task<TReturn> ToOneAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4>, TReturn>> select, CancellationToken cancellationToken = default);
         Task<TReturn> FirstAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4>, TReturn>> select, CancellationToken cancellationToken = default);
@@ -311,6 +325,7 @@ namespace FreeSql
         double Avg<TMember>(Expression<Func<T1, T2, T3, T4, TMember>> column);
 
         ISelect<T1, T2, T3, T4> LeftJoin(Expression<Func<T1, T2, T3, T4, bool>> exp);
+        ISelect<T1, T2, T3, T4> Join(Expression<Func<T1, T2, T3, T4, bool>> exp);
         ISelect<T1, T2, T3, T4> InnerJoin(Expression<Func<T1, T2, T3, T4, bool>> exp);
         ISelect<T1, T2, T3, T4> RightJoin(Expression<Func<T1, T2, T3, T4, bool>> exp);
 
@@ -318,6 +333,7 @@ namespace FreeSql
         ISelect<T1, T2, T3, T4> WhereIf(bool condition, Expression<Func<T1, T2, T3, T4, bool>> exp);
 
         ISelectGrouping<TKey, NativeTuple<T1, T2, T3, T4>> GroupBy<TKey>(Expression<Func<T1, T2, T3, T4, TKey>> exp);
+        ISelect<T1, T2, T3, T4> GroupBySelf<TMember>(Expression<Func<T1, T2, T3, T4, TMember>> column);
 
         ISelect<T1, T2, T3, T4> OrderBy<TMember>(Expression<Func<T1, T2, T3, T4, TMember>> column);
         ISelect<T1, T2, T3, T4> OrderByDescending<TMember>(Expression<Func<T1, T2, T3, T4, TMember>> column);
@@ -346,6 +362,7 @@ namespace FreeSql
         double Avg<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4>, TMember>> column);
 
         ISelect<T1, T2, T3, T4> LeftJoin(Expression<Func<HzyTuple<T1, T2, T3, T4>, bool>> exp);
+        ISelect<T1, T2, T3, T4> Join(Expression<Func<HzyTuple<T1, T2, T3, T4>, bool>> exp);
         ISelect<T1, T2, T3, T4> InnerJoin(Expression<Func<HzyTuple<T1, T2, T3, T4>, bool>> exp);
         ISelect<T1, T2, T3, T4> RightJoin(Expression<Func<HzyTuple<T1, T2, T3, T4>, bool>> exp);
 
@@ -353,6 +370,7 @@ namespace FreeSql
         ISelect<T1, T2, T3, T4> WhereIf(bool condition, Expression<Func<HzyTuple<T1, T2, T3, T4>, bool>> exp);
 
         ISelectGrouping<TKey, NativeTuple<T1, T2, T3, T4>> GroupBy<TKey>(Expression<Func<HzyTuple<T1, T2, T3, T4>, TKey>> exp);
+        ISelect<T1, T2, T3, T4> GroupBySelf<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4>, TMember>> column);
 
         ISelect<T1, T2, T3, T4> OrderBy<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4>, TMember>> column);
         ISelect<T1, T2, T3, T4> OrderByDescending<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4>, TMember>> column);
@@ -378,6 +396,7 @@ namespace FreeSql
         Task<DataTable> ToDataTableAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TDto>> ToListAsync<TDto>(CancellationToken cancellationToken = default);
+        Task ToChunkAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default);
 
         Task<TReturn> ToOneAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, TReturn>> select, CancellationToken cancellationToken = default);
         Task<TReturn> FirstAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, TReturn>> select, CancellationToken cancellationToken = default);
@@ -395,6 +414,7 @@ namespace FreeSql
         Task<int> InsertIntoAsync<TTargetEntity>(string tableName, Expression<Func<HzyTuple<T1, T2, T3, T4, T5>, TTargetEntity>> select, CancellationToken cancellationToken = default) where TTargetEntity : class;
         Task<DataTable> ToDataTableAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5>, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5>, TReturn>> select, CancellationToken cancellationToken = default);
+        Task ToChunkAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5>, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default);
 
         Task<TReturn> ToOneAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5>, TReturn>> select, CancellationToken cancellationToken = default);
         Task<TReturn> FirstAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5>, TReturn>> select, CancellationToken cancellationToken = default);
@@ -428,6 +448,7 @@ namespace FreeSql
         double Avg<TMember>(Expression<Func<T1, T2, T3, T4, T5, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5> LeftJoin(Expression<Func<T1, T2, T3, T4, T5, bool>> exp);
+        ISelect<T1, T2, T3, T4, T5> Join(Expression<Func<T1, T2, T3, T4, T5, bool>> exp);
         ISelect<T1, T2, T3, T4, T5> InnerJoin(Expression<Func<T1, T2, T3, T4, T5, bool>> exp);
         ISelect<T1, T2, T3, T4, T5> RightJoin(Expression<Func<T1, T2, T3, T4, T5, bool>> exp);
 
@@ -435,6 +456,7 @@ namespace FreeSql
         ISelect<T1, T2, T3, T4, T5> WhereIf(bool condition, Expression<Func<T1, T2, T3, T4, T5, bool>> exp);
 
         ISelectGrouping<TKey, NativeTuple<T1, T2, T3, T4, T5>> GroupBy<TKey>(Expression<Func<T1, T2, T3, T4, T5, TKey>> exp);
+        ISelect<T1, T2, T3, T4, T5> GroupBySelf<TMember>(Expression<Func<T1, T2, T3, T4, T5, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5> OrderBy<TMember>(Expression<Func<T1, T2, T3, T4, T5, TMember>> column);
         ISelect<T1, T2, T3, T4, T5> OrderByDescending<TMember>(Expression<Func<T1, T2, T3, T4, T5, TMember>> column);
@@ -463,6 +485,7 @@ namespace FreeSql
         double Avg<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5>, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5> LeftJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5>, bool>> exp);
+        ISelect<T1, T2, T3, T4, T5> Join(Expression<Func<HzyTuple<T1, T2, T3, T4, T5>, bool>> exp);
         ISelect<T1, T2, T3, T4, T5> InnerJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5>, bool>> exp);
         ISelect<T1, T2, T3, T4, T5> RightJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5>, bool>> exp);
 
@@ -470,6 +493,7 @@ namespace FreeSql
         ISelect<T1, T2, T3, T4, T5> WhereIf(bool condition, Expression<Func<HzyTuple<T1, T2, T3, T4, T5>, bool>> exp);
 
         ISelectGrouping<TKey, NativeTuple<T1, T2, T3, T4, T5>> GroupBy<TKey>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5>, TKey>> exp);
+        ISelect<T1, T2, T3, T4, T5> GroupBySelf<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5>, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5> OrderBy<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5>, TMember>> column);
         ISelect<T1, T2, T3, T4, T5> OrderByDescending<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5>, TMember>> column);
@@ -495,6 +519,7 @@ namespace FreeSql
         Task<DataTable> ToDataTableAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TDto>> ToListAsync<TDto>(CancellationToken cancellationToken = default);
+        Task ToChunkAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default);
 
         Task<TReturn> ToOneAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, TReturn>> select, CancellationToken cancellationToken = default);
         Task<TReturn> FirstAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, TReturn>> select, CancellationToken cancellationToken = default);
@@ -512,6 +537,7 @@ namespace FreeSql
         Task<int> InsertIntoAsync<TTargetEntity>(string tableName, Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6>, TTargetEntity>> select, CancellationToken cancellationToken = default) where TTargetEntity : class;
         Task<DataTable> ToDataTableAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6>, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6>, TReturn>> select, CancellationToken cancellationToken = default);
+        Task ToChunkAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6>, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default);
 
         Task<TReturn> ToOneAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6>, TReturn>> select, CancellationToken cancellationToken = default);
         Task<TReturn> FirstAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6>, TReturn>> select, CancellationToken cancellationToken = default);
@@ -545,6 +571,7 @@ namespace FreeSql
         double Avg<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6> LeftJoin(Expression<Func<T1, T2, T3, T4, T5, T6, bool>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6> Join(Expression<Func<T1, T2, T3, T4, T5, T6, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6> InnerJoin(Expression<Func<T1, T2, T3, T4, T5, T6, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6> RightJoin(Expression<Func<T1, T2, T3, T4, T5, T6, bool>> exp);
 
@@ -552,6 +579,7 @@ namespace FreeSql
         ISelect<T1, T2, T3, T4, T5, T6> WhereIf(bool condition, Expression<Func<T1, T2, T3, T4, T5, T6, bool>> exp);
 
         ISelectGrouping<TKey, NativeTuple<T1, T2, T3, T4, T5, T6>> GroupBy<TKey>(Expression<Func<T1, T2, T3, T4, T5, T6, TKey>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6> GroupBySelf<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6> OrderBy<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, TMember>> column);
         ISelect<T1, T2, T3, T4, T5, T6> OrderByDescending<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, TMember>> column);
@@ -580,6 +608,7 @@ namespace FreeSql
         double Avg<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6>, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6> LeftJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6>, bool>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6> Join(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6>, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6> InnerJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6>, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6> RightJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6>, bool>> exp);
 
@@ -587,6 +616,7 @@ namespace FreeSql
         ISelect<T1, T2, T3, T4, T5, T6> WhereIf(bool condition, Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6>, bool>> exp);
 
         ISelectGrouping<TKey, NativeTuple<T1, T2, T3, T4, T5, T6>> GroupBy<TKey>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6>, TKey>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6> GroupBySelf<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6>, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6> OrderBy<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6>, TMember>> column);
         ISelect<T1, T2, T3, T4, T5, T6> OrderByDescending<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6>, TMember>> column);
@@ -612,6 +642,7 @@ namespace FreeSql
         Task<DataTable> ToDataTableAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TDto>> ToListAsync<TDto>(CancellationToken cancellationToken = default);
+        Task ToChunkAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default);
 
         Task<TReturn> ToOneAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, TReturn>> select, CancellationToken cancellationToken = default);
         Task<TReturn> FirstAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, TReturn>> select, CancellationToken cancellationToken = default);
@@ -629,6 +660,7 @@ namespace FreeSql
         Task<int> InsertIntoAsync<TTargetEntity>(string tableName, Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7>, TTargetEntity>> select, CancellationToken cancellationToken = default) where TTargetEntity : class;
         Task<DataTable> ToDataTableAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7>, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7>, TReturn>> select, CancellationToken cancellationToken = default);
+        Task ToChunkAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7>, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default);
 
         Task<TReturn> ToOneAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7>, TReturn>> select, CancellationToken cancellationToken = default);
         Task<TReturn> FirstAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7>, TReturn>> select, CancellationToken cancellationToken = default);
@@ -662,6 +694,7 @@ namespace FreeSql
         double Avg<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7> LeftJoin(Expression<Func<T1, T2, T3, T4, T5, T6, T7, bool>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7> Join(Expression<Func<T1, T2, T3, T4, T5, T6, T7, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7> InnerJoin(Expression<Func<T1, T2, T3, T4, T5, T6, T7, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7> RightJoin(Expression<Func<T1, T2, T3, T4, T5, T6, T7, bool>> exp);
 
@@ -669,6 +702,7 @@ namespace FreeSql
         ISelect<T1, T2, T3, T4, T5, T6, T7> WhereIf(bool condition, Expression<Func<T1, T2, T3, T4, T5, T6, T7, bool>> exp);
 
         ISelectGrouping<TKey, NativeTuple<T1, T2, T3, T4, T5, T6, T7>> GroupBy<TKey>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, TKey>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7> GroupBySelf<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7> OrderBy<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, TMember>> column);
         ISelect<T1, T2, T3, T4, T5, T6, T7> OrderByDescending<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, TMember>> column);
@@ -697,6 +731,7 @@ namespace FreeSql
         double Avg<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7>, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7> LeftJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7>, bool>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7> Join(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7>, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7> InnerJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7>, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7> RightJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7>, bool>> exp);
 
@@ -704,6 +739,7 @@ namespace FreeSql
         ISelect<T1, T2, T3, T4, T5, T6, T7> WhereIf(bool condition, Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7>, bool>> exp);
 
         ISelectGrouping<TKey, NativeTuple<T1, T2, T3, T4, T5, T6, T7>> GroupBy<TKey>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7>, TKey>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7> GroupBySelf<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7>, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7> OrderBy<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7>, TMember>> column);
         ISelect<T1, T2, T3, T4, T5, T6, T7> OrderByDescending<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7>, TMember>> column);
@@ -729,6 +765,7 @@ namespace FreeSql
         Task<DataTable> ToDataTableAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TDto>> ToListAsync<TDto>(CancellationToken cancellationToken = default);
+        Task ToChunkAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default);
 
         Task<TReturn> ToOneAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, TReturn>> select, CancellationToken cancellationToken = default);
         Task<TReturn> FirstAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, TReturn>> select, CancellationToken cancellationToken = default);
@@ -746,6 +783,7 @@ namespace FreeSql
         Task<int> InsertIntoAsync<TTargetEntity>(string tableName, Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8>, TTargetEntity>> select, CancellationToken cancellationToken = default) where TTargetEntity : class;
         Task<DataTable> ToDataTableAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8>, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8>, TReturn>> select, CancellationToken cancellationToken = default);
+        Task ToChunkAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8>, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default);
 
         Task<TReturn> ToOneAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8>, TReturn>> select, CancellationToken cancellationToken = default);
         Task<TReturn> FirstAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8>, TReturn>> select, CancellationToken cancellationToken = default);
@@ -779,6 +817,7 @@ namespace FreeSql
         double Avg<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8> LeftJoin(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, bool>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8> Join(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8> InnerJoin(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8> RightJoin(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, bool>> exp);
 
@@ -786,6 +825,7 @@ namespace FreeSql
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8> WhereIf(bool condition, Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, bool>> exp);
 
         ISelectGrouping<TKey, NativeTuple<T1, T2, T3, T4, T5, T6, T7, T8>> GroupBy<TKey>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, TKey>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8> GroupBySelf<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8> OrderBy<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, TMember>> column);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8> OrderByDescending<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, TMember>> column);
@@ -814,6 +854,7 @@ namespace FreeSql
         double Avg<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8>, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8> LeftJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8>, bool>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8> Join(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8>, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8> InnerJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8>, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8> RightJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8>, bool>> exp);
 
@@ -821,6 +862,7 @@ namespace FreeSql
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8> WhereIf(bool condition, Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8>, bool>> exp);
 
         ISelectGrouping<TKey, NativeTuple<T1, T2, T3, T4, T5, T6, T7, T8>> GroupBy<TKey>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8>, TKey>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8> GroupBySelf<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8>, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8> OrderBy<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8>, TMember>> column);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8> OrderByDescending<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8>, TMember>> column);
@@ -846,6 +888,7 @@ namespace FreeSql
         Task<DataTable> ToDataTableAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TDto>> ToListAsync<TDto>(CancellationToken cancellationToken = default);
+        Task ToChunkAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default);
 
         Task<TReturn> ToOneAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, TReturn>> select, CancellationToken cancellationToken = default);
         Task<TReturn> FirstAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, TReturn>> select, CancellationToken cancellationToken = default);
@@ -863,6 +906,7 @@ namespace FreeSql
         Task<int> InsertIntoAsync<TTargetEntity>(string tableName, Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9>, TTargetEntity>> select, CancellationToken cancellationToken = default) where TTargetEntity : class;
         Task<DataTable> ToDataTableAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9>, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9>, TReturn>> select, CancellationToken cancellationToken = default);
+        Task ToChunkAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9>, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default);
 
         Task<TReturn> ToOneAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9>, TReturn>> select, CancellationToken cancellationToken = default);
         Task<TReturn> FirstAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9>, TReturn>> select, CancellationToken cancellationToken = default);
@@ -896,6 +940,7 @@ namespace FreeSql
         double Avg<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9> LeftJoin(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, bool>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9> Join(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9> InnerJoin(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9> RightJoin(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, bool>> exp);
 
@@ -903,6 +948,7 @@ namespace FreeSql
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9> WhereIf(bool condition, Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, bool>> exp);
 
         ISelectGrouping<TKey, NativeTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9>> GroupBy<TKey>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, TKey>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9> GroupBySelf<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9> OrderBy<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, TMember>> column);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9> OrderByDescending<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, TMember>> column);
@@ -931,6 +977,7 @@ namespace FreeSql
         double Avg<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9>, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9> LeftJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9>, bool>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9> Join(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9>, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9> InnerJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9>, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9> RightJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9>, bool>> exp);
 
@@ -938,6 +985,7 @@ namespace FreeSql
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9> WhereIf(bool condition, Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9>, bool>> exp);
 
         ISelectGrouping<TKey, NativeTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9>> GroupBy<TKey>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9>, TKey>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9> GroupBySelf<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9>, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9> OrderBy<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9>, TMember>> column);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9> OrderByDescending<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9>, TMember>> column);
@@ -963,6 +1011,7 @@ namespace FreeSql
         Task<DataTable> ToDataTableAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TDto>> ToListAsync<TDto>(CancellationToken cancellationToken = default);
+        Task ToChunkAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default);
 
         Task<TReturn> ToOneAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, TReturn>> select, CancellationToken cancellationToken = default);
         Task<TReturn> FirstAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, TReturn>> select, CancellationToken cancellationToken = default);
@@ -980,6 +1029,7 @@ namespace FreeSql
         Task<int> InsertIntoAsync<TTargetEntity>(string tableName, Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>, TTargetEntity>> select, CancellationToken cancellationToken = default) where TTargetEntity : class;
         Task<DataTable> ToDataTableAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>, TReturn>> select, CancellationToken cancellationToken = default);
+        Task ToChunkAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default);
 
         Task<TReturn> ToOneAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>, TReturn>> select, CancellationToken cancellationToken = default);
         Task<TReturn> FirstAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>, TReturn>> select, CancellationToken cancellationToken = default);
@@ -1013,6 +1063,7 @@ namespace FreeSql
         double Avg<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> LeftJoin(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, bool>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> Join(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> InnerJoin(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> RightJoin(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, bool>> exp);
 
@@ -1020,6 +1071,7 @@ namespace FreeSql
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> WhereIf(bool condition, Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, bool>> exp);
 
         ISelectGrouping<TKey, NativeTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>> GroupBy<TKey>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, TKey>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> GroupBySelf<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> OrderBy<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, TMember>> column);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> OrderByDescending<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, TMember>> column);
@@ -1048,6 +1100,7 @@ namespace FreeSql
         double Avg<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> LeftJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>, bool>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> Join(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> InnerJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> RightJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>, bool>> exp);
 
@@ -1055,6 +1108,7 @@ namespace FreeSql
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> WhereIf(bool condition, Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>, bool>> exp);
 
         ISelectGrouping<TKey, NativeTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>> GroupBy<TKey>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>, TKey>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> GroupBySelf<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> OrderBy<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>, TMember>> column);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> OrderByDescending<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>, TMember>> column);
@@ -1080,6 +1134,7 @@ namespace FreeSql
         Task<DataTable> ToDataTableAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TDto>> ToListAsync<TDto>(CancellationToken cancellationToken = default);
+        Task ToChunkAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default);
 
         Task<TReturn> ToOneAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, TReturn>> select, CancellationToken cancellationToken = default);
         Task<TReturn> FirstAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, TReturn>> select, CancellationToken cancellationToken = default);
@@ -1097,6 +1152,7 @@ namespace FreeSql
         Task<int> InsertIntoAsync<TTargetEntity>(string tableName, Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>, TTargetEntity>> select, CancellationToken cancellationToken = default) where TTargetEntity : class;
         Task<DataTable> ToDataTableAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>, TReturn>> select, CancellationToken cancellationToken = default);
+        Task ToChunkAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default);
 
         Task<TReturn> ToOneAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>, TReturn>> select, CancellationToken cancellationToken = default);
         Task<TReturn> FirstAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>, TReturn>> select, CancellationToken cancellationToken = default);
@@ -1130,6 +1186,7 @@ namespace FreeSql
         double Avg<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> LeftJoin(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, bool>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> Join(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> InnerJoin(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> RightJoin(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, bool>> exp);
 
@@ -1137,6 +1194,7 @@ namespace FreeSql
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> WhereIf(bool condition, Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, bool>> exp);
 
         ISelectGrouping<TKey, NativeTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>> GroupBy<TKey>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, TKey>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> GroupBySelf<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> OrderBy<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, TMember>> column);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> OrderByDescending<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, TMember>> column);
@@ -1165,6 +1223,7 @@ namespace FreeSql
         double Avg<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> LeftJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>, bool>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> Join(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> InnerJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> RightJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>, bool>> exp);
 
@@ -1172,6 +1231,7 @@ namespace FreeSql
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> WhereIf(bool condition, Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>, bool>> exp);
 
         ISelectGrouping<TKey, NativeTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>> GroupBy<TKey>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>, TKey>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> GroupBySelf<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> OrderBy<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>, TMember>> column);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> OrderByDescending<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>, TMember>> column);
@@ -1197,6 +1257,7 @@ namespace FreeSql
         Task<DataTable> ToDataTableAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TDto>> ToListAsync<TDto>(CancellationToken cancellationToken = default);
+        Task ToChunkAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default);
 
         Task<TReturn> ToOneAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, TReturn>> select, CancellationToken cancellationToken = default);
         Task<TReturn> FirstAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, TReturn>> select, CancellationToken cancellationToken = default);
@@ -1214,6 +1275,7 @@ namespace FreeSql
         Task<int> InsertIntoAsync<TTargetEntity>(string tableName, Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12>, TTargetEntity>> select, CancellationToken cancellationToken = default) where TTargetEntity : class;
         Task<DataTable> ToDataTableAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12>, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12>, TReturn>> select, CancellationToken cancellationToken = default);
+        Task ToChunkAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12>, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default);
 
         Task<TReturn> ToOneAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12>, TReturn>> select, CancellationToken cancellationToken = default);
         Task<TReturn> FirstAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12>, TReturn>> select, CancellationToken cancellationToken = default);
@@ -1247,6 +1309,7 @@ namespace FreeSql
         double Avg<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> LeftJoin(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, bool>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> Join(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> InnerJoin(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> RightJoin(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, bool>> exp);
 
@@ -1254,6 +1317,7 @@ namespace FreeSql
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> WhereIf(bool condition, Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, bool>> exp);
 
         ISelectGrouping<TKey, NativeTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12>> GroupBy<TKey>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, TKey>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> GroupBySelf<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> OrderBy<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, TMember>> column);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> OrderByDescending<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, TMember>> column);
@@ -1282,6 +1346,7 @@ namespace FreeSql
         double Avg<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12>, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> LeftJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12>, bool>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> Join(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12>, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> InnerJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12>, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> RightJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12>, bool>> exp);
 
@@ -1289,6 +1354,7 @@ namespace FreeSql
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> WhereIf(bool condition, Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12>, bool>> exp);
 
         ISelectGrouping<TKey, NativeTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12>> GroupBy<TKey>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12>, TKey>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> GroupBySelf<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12>, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> OrderBy<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12>, TMember>> column);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> OrderByDescending<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12>, TMember>> column);
@@ -1314,6 +1380,7 @@ namespace FreeSql
         Task<DataTable> ToDataTableAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TDto>> ToListAsync<TDto>(CancellationToken cancellationToken = default);
+        Task ToChunkAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default);
 
         Task<TReturn> ToOneAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, TReturn>> select, CancellationToken cancellationToken = default);
         Task<TReturn> FirstAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, TReturn>> select, CancellationToken cancellationToken = default);
@@ -1331,6 +1398,7 @@ namespace FreeSql
         Task<int> InsertIntoAsync<TTargetEntity>(string tableName, Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>, TTargetEntity>> select, CancellationToken cancellationToken = default) where TTargetEntity : class;
         Task<DataTable> ToDataTableAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>, TReturn>> select, CancellationToken cancellationToken = default);
+        Task ToChunkAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default);
 
         Task<TReturn> ToOneAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>, TReturn>> select, CancellationToken cancellationToken = default);
         Task<TReturn> FirstAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>, TReturn>> select, CancellationToken cancellationToken = default);
@@ -1364,6 +1432,7 @@ namespace FreeSql
         double Avg<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> LeftJoin(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, bool>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> Join(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> InnerJoin(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> RightJoin(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, bool>> exp);
 
@@ -1371,6 +1440,7 @@ namespace FreeSql
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> WhereIf(bool condition, Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, bool>> exp);
 
         ISelectGrouping<TKey, NativeTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>> GroupBy<TKey>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, TKey>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> GroupBySelf<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> OrderBy<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, TMember>> column);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> OrderByDescending<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, TMember>> column);
@@ -1399,6 +1469,7 @@ namespace FreeSql
         double Avg<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> LeftJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>, bool>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> Join(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> InnerJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> RightJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>, bool>> exp);
 
@@ -1406,6 +1477,7 @@ namespace FreeSql
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> WhereIf(bool condition, Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>, bool>> exp);
 
         ISelectGrouping<TKey, NativeTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>> GroupBy<TKey>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>, TKey>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> GroupBySelf<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> OrderBy<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>, TMember>> column);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> OrderByDescending<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>, TMember>> column);
@@ -1431,6 +1503,7 @@ namespace FreeSql
         Task<DataTable> ToDataTableAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TDto>> ToListAsync<TDto>(CancellationToken cancellationToken = default);
+        Task ToChunkAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default);
 
         Task<TReturn> ToOneAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, TReturn>> select, CancellationToken cancellationToken = default);
         Task<TReturn> FirstAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, TReturn>> select, CancellationToken cancellationToken = default);
@@ -1448,6 +1521,7 @@ namespace FreeSql
         Task<int> InsertIntoAsync<TTargetEntity>(string tableName, Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>, TTargetEntity>> select, CancellationToken cancellationToken = default) where TTargetEntity : class;
         Task<DataTable> ToDataTableAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>, TReturn>> select, CancellationToken cancellationToken = default);
+        Task ToChunkAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default);
 
         Task<TReturn> ToOneAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>, TReturn>> select, CancellationToken cancellationToken = default);
         Task<TReturn> FirstAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>, TReturn>> select, CancellationToken cancellationToken = default);
@@ -1481,6 +1555,7 @@ namespace FreeSql
         double Avg<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> LeftJoin(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, bool>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> Join(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> InnerJoin(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> RightJoin(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, bool>> exp);
 
@@ -1488,6 +1563,7 @@ namespace FreeSql
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> WhereIf(bool condition, Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, bool>> exp);
 
         ISelectGrouping<TKey, NativeTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>> GroupBy<TKey>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, TKey>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> GroupBySelf<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> OrderBy<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, TMember>> column);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> OrderByDescending<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, TMember>> column);
@@ -1516,6 +1592,7 @@ namespace FreeSql
         double Avg<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> LeftJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>, bool>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> Join(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> InnerJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> RightJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>, bool>> exp);
 
@@ -1523,6 +1600,7 @@ namespace FreeSql
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> WhereIf(bool condition, Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>, bool>> exp);
 
         ISelectGrouping<TKey, NativeTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>> GroupBy<TKey>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>, TKey>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> GroupBySelf<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> OrderBy<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>, TMember>> column);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> OrderByDescending<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>, TMember>> column);
@@ -1548,6 +1626,7 @@ namespace FreeSql
         Task<DataTable> ToDataTableAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TDto>> ToListAsync<TDto>(CancellationToken cancellationToken = default);
+        Task ToChunkAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default);
 
         Task<TReturn> ToOneAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, TReturn>> select, CancellationToken cancellationToken = default);
         Task<TReturn> FirstAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, TReturn>> select, CancellationToken cancellationToken = default);
@@ -1565,6 +1644,7 @@ namespace FreeSql
         Task<int> InsertIntoAsync<TTargetEntity>(string tableName, Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15>, TTargetEntity>> select, CancellationToken cancellationToken = default) where TTargetEntity : class;
         Task<DataTable> ToDataTableAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15>, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15>, TReturn>> select, CancellationToken cancellationToken = default);
+        Task ToChunkAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15>, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default);
 
         Task<TReturn> ToOneAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15>, TReturn>> select, CancellationToken cancellationToken = default);
         Task<TReturn> FirstAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15>, TReturn>> select, CancellationToken cancellationToken = default);
@@ -1598,6 +1678,7 @@ namespace FreeSql
         double Avg<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> LeftJoin(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, bool>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> Join(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> InnerJoin(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> RightJoin(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, bool>> exp);
 
@@ -1605,6 +1686,7 @@ namespace FreeSql
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> WhereIf(bool condition, Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, bool>> exp);
 
         ISelectGrouping<TKey, NativeTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15>> GroupBy<TKey>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, TKey>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> GroupBySelf<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> OrderBy<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, TMember>> column);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> OrderByDescending<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, TMember>> column);
@@ -1633,6 +1715,7 @@ namespace FreeSql
         double Avg<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15>, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> LeftJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15>, bool>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> Join(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15>, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> InnerJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15>, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> RightJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15>, bool>> exp);
 
@@ -1640,6 +1723,7 @@ namespace FreeSql
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> WhereIf(bool condition, Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15>, bool>> exp);
 
         ISelectGrouping<TKey, NativeTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15>> GroupBy<TKey>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15>, TKey>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> GroupBySelf<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15>, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> OrderBy<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15>, TMember>> column);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> OrderByDescending<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15>, TMember>> column);
@@ -1665,6 +1749,7 @@ namespace FreeSql
         Task<DataTable> ToDataTableAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TDto>> ToListAsync<TDto>(CancellationToken cancellationToken = default);
+        Task ToChunkAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default);
 
         Task<TReturn> ToOneAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, TReturn>> select, CancellationToken cancellationToken = default);
         Task<TReturn> FirstAsync<TReturn>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, TReturn>> select, CancellationToken cancellationToken = default);
@@ -1682,6 +1767,7 @@ namespace FreeSql
         Task<int> InsertIntoAsync<TTargetEntity>(string tableName, Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16>, TTargetEntity>> select, CancellationToken cancellationToken = default) where TTargetEntity : class;
         Task<DataTable> ToDataTableAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16>, TReturn>> select, CancellationToken cancellationToken = default);
         Task<List<TReturn>> ToListAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16>, TReturn>> select, CancellationToken cancellationToken = default);
+        Task ToChunkAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16>, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default);
 
         Task<TReturn> ToOneAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16>, TReturn>> select, CancellationToken cancellationToken = default);
         Task<TReturn> FirstAsync<TReturn>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16>, TReturn>> select, CancellationToken cancellationToken = default);
@@ -1715,6 +1801,7 @@ namespace FreeSql
         double Avg<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> LeftJoin(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, bool>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> Join(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> InnerJoin(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> RightJoin(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, bool>> exp);
 
@@ -1722,6 +1809,7 @@ namespace FreeSql
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> WhereIf(bool condition, Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, bool>> exp);
 
         ISelectGrouping<TKey, NativeTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16>> GroupBy<TKey>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, TKey>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> GroupBySelf<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> OrderBy<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, TMember>> column);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> OrderByDescending<TMember>(Expression<Func<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, TMember>> column);
@@ -1750,6 +1838,7 @@ namespace FreeSql
         double Avg<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16>, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> LeftJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16>, bool>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> Join(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16>, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> InnerJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16>, bool>> exp);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> RightJoin(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16>, bool>> exp);
 
@@ -1757,6 +1846,7 @@ namespace FreeSql
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> WhereIf(bool condition, Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16>, bool>> exp);
 
         ISelectGrouping<TKey, NativeTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16>> GroupBy<TKey>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16>, TKey>> exp);
+        ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> GroupBySelf<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16>, TMember>> column);
 
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> OrderBy<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16>, TMember>> column);
         ISelect<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> OrderByDescending<TMember>(Expression<Func<HzyTuple<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16>, TMember>> column);
