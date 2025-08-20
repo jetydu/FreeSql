@@ -21,6 +21,7 @@ namespace FreeSql.Internal
 {
     public class Utils
     {
+        public static bool IsStrict = true;
         /// <summary>
         /// 用于解决多实例情况下的静态集合缓存问题
         /// </summary>
@@ -73,7 +74,7 @@ namespace FreeSql.Internal
             try
             {
                 if (entity.IsAbstract == false && entity.IsInterface == false)
-                    entityDefault = Activator.CreateInstance(entity);
+                    entityDefault = Activator.CreateInstance(entity, true);
             }
             catch { }
             var tbattr = common.GetEntityTableAttribute(entity);
@@ -1206,9 +1207,9 @@ namespace FreeSql.Internal
                                 }
                             }
                         }
-                        else if(minPkCols.Any(c => tbmid.ColumnsByCs[c.CsName].Attribute.IsPrimary == false)) 
+                        else if(IsStrict && minPkCols.Any(c => tbmid.ColumnsByCs[c.CsName].Attribute.IsPrimary == false)) 
                         {
-                            nvref.Exception = new Exception($"导航属性 {trytbTypeName}.{pnv.Name} 解析错误，中间类主键错误：{midType.Name}({string.Join(",", tbmid.Primarys.Select(a => a.CsName))}) 与两边不匹配");
+                            nvref.Exception = new Exception(CoreErrorStrings.ManyToMany_ParsingError_InconsistentClass_PrimaryKeyError(trytbTypeName, pnv.Name, midType.Name, tbmid.Primarys));
                             trytb.AddOrUpdateTableRef(pnv.Name, nvref);
                         }
                     }
@@ -2557,7 +2558,7 @@ namespace FreeSql.Internal
                                     Expression.Return(returnTarget, Expression.Convert(tryparseVarExp, typeof(object))),
                                     Expression.IfThenElse(
                                         Expression.IsTrue(Expression.Call(MethodDecimalTryParse, Expression.Convert(valueExp, typeof(string)), Expression.Constant(System.Globalization.NumberStyles.Any), Expression.Constant(null, typeof(IFormatProvider)), tryparseVarExpDecimal)),
-                                        Expression.Return(returnTarget, Expression.Convert(Expression.Convert(tryparseVarExpDecimal, tryparseVarExp.Type), typeof(object))),
+                                        Expression.Return(returnTarget, Expression.Call(MethodConvertChangeType,Expression.Convert(tryparseVarExpDecimal,typeof(object)),Expression.Constant(type, typeof(Type)))),
                                         Expression.Return(returnTarget, Expression.Convert(Expression.Default(typeOrg), typeof(object)))
                                     )
                                 )
@@ -2573,7 +2574,7 @@ namespace FreeSql.Internal
                                     Expression.Return(returnTarget, Expression.Convert(tryparseVarExp, typeof(object))),
                                     Expression.IfThenElse(
                                         Expression.IsTrue(Expression.Call(MethodDecimalTryParse, Expression.Convert(valueExp, typeof(string)), Expression.Constant(System.Globalization.NumberStyles.Any), Expression.Constant(null, typeof(IFormatProvider)), tryparseVarExpDecimal)),
-                                        Expression.Return(returnTarget, Expression.Convert(Expression.Convert(tryparseVarExpDecimal, tryparseVarExp.Type), typeof(object))),
+                                        Expression.Return(returnTarget, Expression.Call(MethodConvertChangeType,Expression.Convert(tryparseVarExpDecimal,typeof(object)),Expression.Constant(type, typeof(Type)))),
                                         Expression.Return(returnTarget, Expression.Convert(Expression.Default(typeOrg), typeof(object)))
                                     )
                                 )
@@ -2589,7 +2590,7 @@ namespace FreeSql.Internal
                                     Expression.Return(returnTarget, Expression.Convert(tryparseVarExp, typeof(object))),
                                     Expression.IfThenElse(
                                         Expression.IsTrue(Expression.Call(MethodDecimalTryParse, Expression.Convert(valueExp, typeof(string)), Expression.Constant(System.Globalization.NumberStyles.Any), Expression.Constant(null, typeof(IFormatProvider)), tryparseVarExpDecimal)),
-                                        Expression.Return(returnTarget, Expression.Convert(Expression.Convert(tryparseVarExpDecimal, tryparseVarExp.Type), typeof(object))),
+                                        Expression.Return(returnTarget, Expression.Call(MethodConvertChangeType,Expression.Convert(tryparseVarExpDecimal,typeof(object)),Expression.Constant(type, typeof(Type)))),
                                         Expression.Return(returnTarget, Expression.Convert(Expression.Default(typeOrg), typeof(object)))
                                     )
                                 )
@@ -2617,7 +2618,7 @@ namespace FreeSql.Internal
                                     Expression.Return(returnTarget, Expression.Convert(tryparseVarExp, typeof(object))),
                                     Expression.IfThenElse(
                                         Expression.IsTrue(Expression.Call(MethodDecimalTryParse, Expression.Convert(valueExp, typeof(string)), Expression.Constant(System.Globalization.NumberStyles.Any), Expression.Constant(null, typeof(IFormatProvider)), tryparseVarExpDecimal)),
-                                        Expression.Return(returnTarget, Expression.Convert(Expression.Convert(tryparseVarExpDecimal, tryparseVarExp.Type), typeof(object))),
+                                        Expression.Return(returnTarget, Expression.Call(MethodConvertChangeType,Expression.Convert(tryparseVarExpDecimal,typeof(object)),Expression.Constant(type, typeof(Type)))),
                                         Expression.Return(returnTarget, Expression.Convert(Expression.Default(typeOrg), typeof(object)))
                                     )
                                 )
@@ -2633,7 +2634,7 @@ namespace FreeSql.Internal
                                     Expression.Return(returnTarget, Expression.Convert(tryparseVarExp, typeof(object))),
                                     Expression.IfThenElse(
                                         Expression.IsTrue(Expression.Call(MethodDecimalTryParse, Expression.Convert(valueExp, typeof(string)), Expression.Constant(System.Globalization.NumberStyles.Any), Expression.Constant(null, typeof(IFormatProvider)), tryparseVarExpDecimal)),
-                                        Expression.Return(returnTarget, Expression.Convert(Expression.Convert(tryparseVarExpDecimal, tryparseVarExp.Type), typeof(object))),
+                                        Expression.Return(returnTarget, Expression.Call(MethodConvertChangeType,Expression.Convert(tryparseVarExpDecimal,typeof(object)),Expression.Constant(type, typeof(Type)))),
                                         Expression.Return(returnTarget, Expression.Convert(Expression.Default(typeOrg), typeof(object)))
                                     )
                                 )
@@ -2649,7 +2650,7 @@ namespace FreeSql.Internal
                                     Expression.Return(returnTarget, Expression.Convert(tryparseVarExp, typeof(object))),
                                     Expression.IfThenElse(
                                         Expression.IsTrue(Expression.Call(MethodDecimalTryParse, Expression.Convert(valueExp, typeof(string)), Expression.Constant(System.Globalization.NumberStyles.Any), Expression.Constant(null, typeof(IFormatProvider)), tryparseVarExpDecimal)),
-                                        Expression.Return(returnTarget, Expression.Convert(Expression.Convert(tryparseVarExpDecimal, tryparseVarExp.Type), typeof(object))),
+                                        Expression.Return(returnTarget, Expression.Call(MethodConvertChangeType,Expression.Convert(tryparseVarExpDecimal,typeof(object)),Expression.Constant(type, typeof(Type)))),
                                         Expression.Return(returnTarget, Expression.Convert(Expression.Default(typeOrg), typeof(object)))
                                     )
                                 )
@@ -2797,7 +2798,7 @@ namespace FreeSql.Internal
         }
         public static object GetDataReaderValue(Type type, object value)
         {
-            //if (value == null || value == DBNull.Value) return Activator.CreateInstance(type);
+            //if (value == null || value == DBNull.Value) return Activator.CreateInstance(type, true);
             if (type == null) return value;
             var valueType = value?.GetType() ?? type;
             if (TypeHandlers.TryGetValue(valueType, out var typeHandler)) return typeHandler.Serialize(value);

@@ -117,7 +117,10 @@ namespace FreeSql.QuestDb
                     if (objType?.FullName == "System.Byte[]") return null;
 
                     var argIndex = 0;
-                    if (objType == null && callExp.Method.DeclaringType == typeof(Enumerable))
+                    if (objType == null && (
+                        callExp.Method.DeclaringType == typeof(Enumerable) ||
+                        callExp.Method.DeclaringType.FullName == "System.MemoryExtensions"
+                        ))
                     {
                         objExp = callExp.Arguments.FirstOrDefault();
                         objType = objExp?.Type;
@@ -311,7 +314,7 @@ namespace FreeSql.QuestDb
                         var leftLike = exp.Object.NodeType == ExpressionType.MemberAccess ? left : $"({left})";
                         var args0Value = getExp(exp.Arguments[0]);
                         if (args0Value == "NULL") return $"{leftLike} IS NULL";
-                        if (args0Value.Contains("%"))
+                        if (new[] { '%', '_', '[', ']', '*' }.Any(wildcard => args0Value.Contains(wildcard)))
                         {
                             if (exp.Method.Name == "StartsWith") return $"strpos({left}, {args0Value}) = 1";
                             if (exp.Method.Name == "EndsWith") return $"strpos({left}, {args0Value}) = length({left})-length({args0Value})+1";

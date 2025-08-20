@@ -576,10 +576,10 @@ namespace base_entity
                 //.UseSlaveWeight(10, 1, 1, 5)
 
 
-                .UseConnectionString(FreeSql.DataType.Firebird, @"database=localhost:D:\fbdata\EXAMPLES.fdb;user=sysdba;password=123456;max pool size=5")
+                //.UseConnectionString(FreeSql.DataType.Firebird, @"database=localhost:D:\fbdata\EXAMPLES.fdb;user=sysdba;password=123456;max pool size=5")
                 //.UseQuoteSqlName(false)
 
-                .UseConnectionString(FreeSql.DataType.MySql, "Data Source=127.0.0.1;Port=3306;User ID=root;Password=root;Initial Catalog=cccddd;Charset=utf8;SslMode=none;min pool size=1;Max pool size=3;AllowLoadLocalInfile=true")
+                //.UseConnectionString(FreeSql.DataType.MySql, "Data Source=127.0.0.1;Port=3306;User ID=root;Password=root;Initial Catalog=cccddd;Charset=utf8;SslMode=none;min pool size=1;Max pool size=3;AllowLoadLocalInfile=true")
 
                 //.UseConnectionString(FreeSql.DataType.SqlServer, "Data Source=.;Integrated Security=True;Initial Catalog=freesqlTest;Pooling=true;Max Pool Size=3;TrustServerCertificate=true")
                 //.UseAdoConnectionPool(false)
@@ -620,6 +620,139 @@ namespace base_entity
                 .Build();
             BaseEntity.Initialization(fsql, () => _asyncUow.Value);
             #endregion
+
+
+            fsql.Insert(new User1 { Nickname = "nickname11", Username = "username11", Description = "desc11" }).ExecuteAffrows();
+            Task.Run(async () =>
+            {
+                await foreach (var xxs1 in fsql.Select<User1>().WithTempQuery(a => new { a.Nickname }).ToChunkAsyncEnumerable(2))
+                {
+                    foreach (var item in xxs1)
+                        Console.WriteLine(item.Nickname);
+                }
+            }).Wait();
+
+            string[] names33 = ["bbb", "ccc"];
+            var sss33 = fsql.Select<User1>().Where(a => System.Linq.Enumerable.Contains(names33, a.Username)).ToSql();
+            var sss32 = fsql.Select<User1>().Where(a => System.MemoryExtensions.Contains(names33, a.Username)).ToSql(); //出错
+
+
+            string inputUserId = "1444";
+
+            var testst2 = fsql.Select<plataction>().Where(a => a.PlatStatus != -1 && a.PlatStatus != 1)
+               .FromQuery<platactioninuser>(fsql.Select<platactioninuser>().Where(b => b.PlatUserId == inputUserId))
+               .InnerJoin((a, b) => a.Id == b.PlatPathId)
+               .ToList((a, b) => a);
+
+
+            fsql.UseJsonMap();
+
+            fsql.Select<Table11>().Where(a => a.Options.Value1 == 100 && a.Options.Value2 == "xx").ToList();
+
+            fsql.Delete<BaseDistrict>().Where("1=1").ExecuteAffrows();
+            var repoxx = fsql.GetRepository<VM_District_Child>();
+            repoxx.DbContextOptions.EnableCascadeSave = true;
+            repoxx.DbContextOptions.NoneParameter = true;
+            repoxx.Insert(new VM_District_Child
+            {
+                Code = "100000",
+                Name = "中国",
+                Childs = new List<VM_District_Child>(new[] {
+                    new VM_District_Child
+                    {
+                        Code = "110000",
+                        Name = "北京",
+                        Childs = new List<VM_District_Child>(new[] {
+                            new VM_District_Child{ Code="110100", Name = "北京市" },
+                            new VM_District_Child{ Code="110101", Name = "东城区" },
+                        })
+                    }
+                })
+            });
+            var ttre1 = fsql.Select<VM_District_Child>().Where(a => a.Name == "中国")
+                .AsTreeCte(pathSelector: a => $"[{a.Name}]{a.Code}", pathSeparator: "=>")
+                .OrderBy(a => a.Code).ToTreeList();
+            fsql.Select<VM_District_Child>().Where(a => a.Name == "中国")
+                .AsTreeCte(pathSelector: a => $"[{a.Name}]{a.Code}", pathSeparator: "=>")
+                .OrderBy(a => a.Code).InsertInto("VM_District_Child_Copy", a => new VM_District_Child { Code = a.Code, Name = a.Name });
+
+            var usergroupRepository = fsql.GetAggregateRootRepository<UserGroup>();
+            usergroupRepository.Delete(a => true);
+            usergroupRepository.Orm.Delete<User1>().Where(a => true).ExecuteAffrows();
+            usergroupRepository.Insert(new[]{
+                new UserGroup
+                {
+                    CreateTime = DateTime.Now,
+                    GroupName = "group1",
+                    UpdateTime = DateTime.Now,
+                    Sort = 1,
+                    User1s = new List<User1>
+                    {
+                        new User1 { Nickname = "nickname11", Username = "username11", Description = "desc11" },
+                        new User1 { Nickname = "nickname12", Username = "username12", Description = "desc12" },
+                        new User1 { Nickname = "nickname13", Username = "username13", Description = "desc13" },
+                    }
+                },
+                new UserGroup
+                {
+                    CreateTime = DateTime.Now,
+                    GroupName = "group2",
+                    UpdateTime = DateTime.Now,
+                    Sort = 2,
+                    User1s = new List<User1>
+                    {
+                        new User1 { Nickname = "nickname21", Username = "username21", Description = "desc21" },
+                        new User1 { Nickname = "nickname22", Username = "username22", Description = "desc22" },
+                        new User1 { Nickname = "nickname23", Username = "username23", Description = "desc23" },
+                        new User1 { Nickname = "nickname24", Username = "username24", Description = "desc24" },
+                    }
+                },
+            });
+            Task.Run(async () =>
+            {
+                await foreach (var xxs1 in fsql.Select<User1>().WithTempQuery(a => new { a.Nickname, a.Username }).ToChunkAsyncEnumerable(2))
+                {
+                    foreach (var item in xxs1)
+                        Console.WriteLine(item.Nickname);
+                }
+            }).Wait();
+            var ugroupFirst = usergroupRepository.Select.First();
+            ugroupFirst.Sort++;
+            usergroupRepository.Update(ugroupFirst);
+            var userRepository = fsql.GetAggregateRootRepository<User1>();
+            var testsublist1 = fsql.Select<UserGroup>()
+                .ToList(a => new
+                {
+                    a.Id,
+                    list = userRepository.Select.Where(b => a.Id == 1).Where(b => b.GroupId == a.Id).ToList(),
+                    list2 = fsql.Select<User1>().Where(b => a.Id == 2).Where(b => b.GroupId == a.Id).ToList(b => b.Nickname),
+                });
+            var testsublist2 = fsql.Select<UserGroup, User1>()
+                .ToList(a => new
+                {
+                    a.t1.Id,
+                    list = userRepository.Select.Where(b => a.t1.Id == 1).Where(b => b.GroupId == a.t1.Id).ToList(),
+                    list2 = fsql.Select<User1, UserGroup>().Where(b => a.t1.Id == 2).Where(b => b.t1.GroupId == a.t1.Id).ToList(b => b.t1.Nickname),
+                });
+
+
+            fsql.Select<User1>().WithTempQuery(a => new { a.Nickname, a.Username }).ToChunk(10, e =>
+            {
+                foreach (var item in e.Object)
+                    Console.WriteLine(item.Nickname);
+            });
+            Task.Run(async () =>
+            {
+                await foreach (var xxs1 in fsql.Select<User1>().WithTempQuery(a => new { a.Nickname, a.Username }).ToChunkAsyncEnumerable(10))
+                {
+                    foreach (var item in xxs1)
+                        Console.WriteLine(item.Nickname);
+                }
+            }).Wait();
+
+
+            Utils.IsStrict = false;
+            var user1Tb = fsql.CodeFirst.GetTableByEntity(typeof(User11));
 
             fsql.Delete<User1>().Where("1=1").ExecuteAffrows();
             fsql.Insert(new List<User1>
@@ -798,52 +931,8 @@ namespace base_entity
 
             var firebirdList01 = fsql.Select<User1>().ToList();
 
-            fsql.UseJsonMap();
 
-            fsql.Select<Table11>().Where(a => a.Options.Value1 == 100 && a.Options.Value2 == "xx").ToList();
-
-            var usergroupRepository = fsql.GetAggregateRootRepository<UserGroup>();
-            usergroupRepository.Delete(a => true);
-            usergroupRepository.Insert(new[]{
-                new UserGroup
-                {
-                    CreateTime = DateTime.Now,
-                    GroupName = "group1",
-                    UpdateTime = DateTime.Now,
-                    Sort = 1,
-                    User1s = new List<User1>
-                    {
-                        new User1 { Nickname = "nickname11", Username = "username11", Description = "desc11" },
-                        new User1 { Nickname = "nickname12", Username = "username12", Description = "desc12" },
-                        new User1 { Nickname = "nickname13", Username = "username13", Description = "desc13" },
-                    }
-                },
-                new UserGroup
-                {
-                    CreateTime = DateTime.Now,
-                    GroupName = "group2",
-                    UpdateTime = DateTime.Now,
-                    Sort = 2,
-                    User1s = new List<User1>
-                    {
-                        new User1 { Nickname = "nickname21", Username = "username21", Description = "desc21" },
-                        new User1 { Nickname = "nickname22", Username = "username22", Description = "desc22" },
-                        new User1 { Nickname = "nickname23", Username = "username23", Description = "desc23" },
-                    }
-                },
-            });
-            var ugroupFirst = usergroupRepository.Select.First();
-            ugroupFirst.Sort++;
-            usergroupRepository.Update(ugroupFirst);
-            var userRepository = fsql.GetAggregateRootRepository<User1>();
-
-            var testsublist1 = fsql.Select<UserGroup>()
-                .First(a => new
-                {
-                    a.Id,
-                    list = userRepository.Select.Where(b => b.GroupId == a.Id).ToList(),
-                    list2 = userRepository.Select.Where(b => b.GroupId == a.Id).ToList(b => b.Nickname),
-                });
+            
 
 
 
@@ -926,30 +1015,6 @@ namespace base_entity
 
 
 
-
-            fsql.Delete<BaseDistrict>().Where("1=1").ExecuteAffrows();
-            var repoxx = fsql.GetRepository<VM_District_Child>();
-            repoxx.DbContextOptions.EnableCascadeSave = true;
-            repoxx.DbContextOptions.NoneParameter = true;
-            repoxx.Insert(new VM_District_Child
-            {
-                Code = "100000",
-                Name = "中国",
-                Childs = new List<VM_District_Child>(new[] {
-                    new VM_District_Child
-                    {
-                        Code = "110000",
-                        Name = "北京",
-                        Childs = new List<VM_District_Child>(new[] {
-                            new VM_District_Child{ Code="110100", Name = "北京市" },
-                            new VM_District_Child{ Code="110101", Name = "东城区" },
-                        })
-                    }
-                })
-            });
-            var ttre1 = fsql.Select<VM_District_Child>().Where(a => a.Name == "中国")
-                .AsTreeCte(pathSelector: a => $"[{a.Name}]{a.Code}", pathSeparator: "=>")
-                .OrderBy(a => a.Code).ToTreeList(); ;
 
             var list111222 = fsql.Select<OrderLine, Product>()
 			    .InnerJoin((l, p) => l.ProductId == p.ID)
@@ -1751,7 +1816,7 @@ var sql11111 = fsql.Select<Class1111>()
                 Math.PI
             });
 
-            var testsublist2 = fsql.Select<UserGroup>()
+            var testsublist21 = fsql.Select<UserGroup>()
                 .GroupBy(a => new { a.Id })
                 .WithTempQuery(a => a.Key)
                 .First(a => new
@@ -3456,7 +3521,7 @@ class Table11
 {
     public int Id { get; set; }
 
-    [JsonMap, Column(DbType = "json")]
+    [JsonMap]
     public TableOptions Options { get; set; }
 }
 class TableOptions
@@ -3564,4 +3629,100 @@ public static class ExpressionCallExtesions
         context.Value.Result = $"count(distinct {context.Value.ParsedContent["column"]})";
         return 0;
     }
+}
+
+class User11
+{
+    public int Id { get; set; } //Id、UserId、User_id
+
+    public List<Role11> Role11s { get; set; }
+}
+class Role11
+{
+    public int Id { get; set; }
+    public string Name { get; set; }
+
+    public List<User11> User11s { get; set; }
+}
+class User11Role11
+{
+    public int Id { get; set; }
+
+    public int User11Id { get; set; }
+    public User11 User11 { get; set; }
+
+    public int Role11Id { get; set; }
+    public Role11 Role11 { get; set; }
+}
+
+[JsonObject(MemberSerialization.OptIn), Table(DisableSyncStructure = true)]
+public partial class plataction
+{
+
+    [JsonProperty, Column(StringLength = 40, IsPrimary = true, IsNullable = false)]
+    public string Id { get; set; }
+
+    [JsonProperty, Column(StringLength = 20)]
+    public string ActionName { get; set; }
+
+    [JsonProperty, Column(StringLength = 200)]
+    public string ActionUrl { get; set; }
+
+    [JsonProperty]
+    public string PlatPathId { get; set; }
+
+    [JsonProperty]
+    public int PlatStatus { get; set; }
+
+    [JsonProperty, Column(StringLength = 40)]
+    public string CreateBy { get; set; }
+
+    [JsonProperty, Column(DbType = "datetime")]
+    public DateTime? CreateAt { get; set; }
+
+    [JsonProperty, Column(StringLength = 40)]
+    public string ModifyBy { get; set; }
+
+    [JsonProperty, Column(DbType = "datetime")]
+    public DateTime? ModifyAt { get; set; }
+
+    [JsonProperty]
+    public int PlatOrderNo { get; set; }
+
+    [JsonProperty]
+    public int? IsDeleted { get; set; }
+
+}
+
+[JsonObject(MemberSerialization.OptIn), Table(DisableSyncStructure = true)]
+public partial class platactioninuser
+{
+
+    [JsonProperty, Column(IsPrimary = true, IsNullable = false)]
+    public string Id { get; set; }
+
+    [JsonProperty]
+    public string PlatPathId { get; set; }
+
+    [JsonProperty]
+    public string PlatUserId { get; set; }
+
+    [JsonProperty]
+    public int? IsDeleted { get; set; }
+
+    [JsonProperty, Column(StringLength = 40)]
+    public string CreateBy { get; set; }
+
+    [JsonProperty, Column(DbType = "datetime")]
+    public DateTime? CreateAt { get; set; }
+
+    [JsonProperty, Column(StringLength = 40)]
+    public string ModifyBy { get; set; }
+
+    [JsonProperty, Column(DbType = "datetime")]
+    public DateTime? ModifyAt { get; set; }
+
+    [JsonProperty]
+    public int? PlatStatus { get; set; }
+
 }

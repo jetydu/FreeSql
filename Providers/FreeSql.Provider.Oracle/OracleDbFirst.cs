@@ -428,7 +428,7 @@ to_char(b.comments),
 nvl(FREESQL_LONG_TO_CHAR_DEFAULT(a.table_name, a.column_name),'')
 from all_tab_cols a
 left join all_col_comments b on b.owner = a.owner and b.table_name = a.table_name and b.column_name = a.column_name
-where {(ignoreCase ? "lower(a.owner)" : "a.owner")} in ({databaseIn}) and {loc8} and a.column_id is not null
+where {(ignoreCase ? "lower(a.owner)" : "a.owner")} in ({databaseIn}){(loc2.Count <= 10 ? $" and {loc8}" : "")} and a.column_id is not null
 ";
             ds = _orm.Ado.ExecuteArray(CommandType.Text, sql);
             if (ds == null) return loc1;
@@ -436,8 +436,11 @@ where {(ignoreCase ? "lower(a.owner)" : "a.owner")} in ({databaseIn}) and {loc8}
             var ds2 = new List<object[]>();
             foreach (var row in ds)
             {
+                var table_id = string.Concat(row[0]);
+                if (database.Length == 1) table_id = table_id.Substring(table_id.IndexOf('.') + 1);
+                if (!loc2.ContainsKey(table_id)) continue;
                 var ds2item = new object[9];
-                ds2item[0] = row[0];
+                ds2item[0] = table_id;
                 ds2item[1] = row[1];
                 ds2item[2] = Regex.Replace(string.Concat(row[2]), @"\(\d+\)", "");
                 ds2item[4] = OracleCodeFirst.GetOracleSqlTypeFullName(new object[] { row[1], row[2], row[3], row[4], row[5], row[6] });
@@ -462,10 +465,6 @@ where {(ignoreCase ? "lower(a.owner)" : "a.owner")} in ({databaseIn}) and {loc8}
                 string comment = string.Concat(row[7]);
                 string defaultValue = string.Concat(row[8]);
                 if (max_length == 0) max_length = -1;
-                if (database.Length == 1)
-                {
-                    table_id = table_id.Substring(table_id.IndexOf('.') + 1);
-                }
                 loc3[table_id].Add(column, new DbColumnInfo
                 {
                     Name = column,
@@ -500,7 +499,7 @@ all_ind_columns c
 where a.index_name = c.index_name
 and a.table_owner = c.table_owner
 and a.table_name = c.table_name
-and {(ignoreCase ? "lower(a.table_owner)" : "a.table_owner")} in ({databaseIn}) and {loc8}
+and {(ignoreCase ? "lower(a.table_owner)" : "a.table_owner")} in ({databaseIn}){(loc2.Count <= 10 ? $" and {loc8}" : "")}
 ";
             ds = _orm.Ado.ExecuteArray(CommandType.Text, sql);
             if (ds == null) return loc1;
@@ -516,8 +515,8 @@ and {(ignoreCase ? "lower(a.table_owner)" : "a.table_owner")} in ({databaseIn}) 
                 bool is_primary_key = string.Concat(row[4]) == "1";
                 bool is_clustered = string.Concat(row[5]) == "1";
                 bool is_desc = string.Concat(row[6]) == "1";
-                if (database.Length == 1)
-                    table_id = table_id.Substring(table_id.IndexOf('.') + 1);
+                if (database.Length == 1) table_id = table_id.Substring(table_id.IndexOf('.') + 1);
+                if (!loc2.ContainsKey(table_id)) continue;
                 if (loc3.ContainsKey(table_id) == false || loc3[table_id].ContainsKey(column) == false) continue;
                 var loc9 = loc3[table_id][column];
                 if (loc9.IsPrimary == false && is_primary_key) loc9.IsPrimary = is_primary_key;
@@ -528,14 +527,14 @@ and {(ignoreCase ? "lower(a.table_owner)" : "a.table_owner")} in ({databaseIn}) 
                 if (!indexColumns.TryGetValue(table_id, out loc10))
                     indexColumns.Add(table_id, loc10 = new Dictionary<string, DbIndexInfo>());
                 if (!loc10.TryGetValue(index_id, out loc11))
-                    loc10.Add(index_id, loc11 = new DbIndexInfo());
+                    loc10.Add(index_id, loc11 = new DbIndexInfo { Name = index_id });
                 loc11.Columns.Add(new DbIndexColumnInfo { Column = loc9, IsDesc = is_desc });
                 if (is_unique && !is_primary_key)
                 {
                     if (!uniqueColumns.TryGetValue(table_id, out loc10))
                         uniqueColumns.Add(table_id, loc10 = new Dictionary<string, DbIndexInfo>());
                     if (!loc10.TryGetValue(index_id, out loc11))
-                        loc10.Add(index_id, loc11 = new DbIndexInfo());
+                        loc10.Add(index_id, loc11 = new DbIndexInfo { Name = index_id });
                     loc11.Columns.Add(new DbIndexColumnInfo { Column = loc9, IsDesc = is_desc });
                 }
             }
@@ -589,7 +588,7 @@ and a.owner = c.owner 　　
 and a.table_name = c.table_name 　　
 and b.owner = d.owner 　　
 and b.table_name = d.table_name
-and {(ignoreCase ? "lower(a.owner)" : "a.owner")} in ({databaseIn}) and {loc8}
+and {(ignoreCase ? "lower(a.owner)" : "a.owner")} in ({databaseIn}){(loc2.Count <= 10 ? $" and {loc8}" : "")}
 ";
                 ds = _orm.Ado.ExecuteArray(CommandType.Text, sql);
                 if (ds == null) return loc1;
@@ -608,9 +607,11 @@ and {(ignoreCase ? "lower(a.owner)" : "a.owner")} in ({databaseIn}) and {loc8}
                         table_id = table_id.Substring(table_id.IndexOf('.') + 1);
                         ref_table_id = ref_table_id.Substring(ref_table_id.IndexOf('.') + 1);
                     }
+                    if (!loc2.ContainsKey(table_id)) continue;
+                    if (!loc2.ContainsKey(ref_table_id)) continue;
                     if (loc3.ContainsKey(table_id) == false || loc3[table_id].ContainsKey(column) == false) continue;
+                    if (loc3.ContainsKey(ref_table_id) == false || loc3[ref_table_id].ContainsKey(referenced_column) == false) continue;
                     var loc9 = loc3[table_id][column];
-                    if (loc2.ContainsKey(ref_table_id) == false) continue;
                     var loc10 = loc2[ref_table_id];
                     var loc11 = loc3[ref_table_id][referenced_column];
 

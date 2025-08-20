@@ -344,6 +344,17 @@ namespace FreeSql.Internal
                                     case ExpressionType.Equal:
                                     case ExpressionType.Not:
                                         initExpArg = Expression.Condition(initExpArg, Expression.Constant(true, typeof(bool)), Expression.Constant(false, typeof(bool)));
+                                        switch (_ado.DataType)
+                                        {
+                                            case DataType.PostgreSQL: //#2093
+                                            case DataType.OdbcPostgreSQL:
+                                            case DataType.CustomPostgreSQL:
+                                            case DataType.KingbaseES:
+                                            case DataType.ShenTong:
+                                            case DataType.Xugu:
+                                                initExpArg = Expression.Convert(initExpArg, typeof(bool));
+                                                break;
+                                        }
                                         break;
                                 }
                             var child = new ReadAnonymousTypeInfo
@@ -456,6 +467,17 @@ namespace FreeSql.Internal
                                     case ExpressionType.Equal:
                                     case ExpressionType.Not:
                                         initExpArg = Expression.Condition(initExpArg, Expression.Constant(true, typeof(bool)), Expression.Constant(false, typeof(bool)));
+                                        switch (_ado.DataType)
+                                        {
+                                            case DataType.PostgreSQL: //#2093
+                                            case DataType.OdbcPostgreSQL:
+                                            case DataType.CustomPostgreSQL:
+                                            case DataType.KingbaseES:
+                                            case DataType.ShenTong:
+                                            case DataType.Xugu:
+                                                initExpArg = Expression.Convert(initExpArg, typeof(bool));
+                                                break;
+                                        }
                                         break;
                                 }
                             var child = new ReadAnonymousTypeInfo
@@ -507,6 +529,17 @@ namespace FreeSql.Internal
                                     case ExpressionType.Equal:
                                     case ExpressionType.Not:
                                         initExpArg = Expression.Condition(initExpArg, Expression.Constant(true, typeof(bool)), Expression.Constant(false, typeof(bool)));
+                                        switch (_ado.DataType)
+                                        {
+                                            case DataType.PostgreSQL: //#2093
+                                            case DataType.OdbcPostgreSQL:
+                                            case DataType.CustomPostgreSQL:
+                                            case DataType.KingbaseES:
+                                            case DataType.ShenTong:
+                                            case DataType.Xugu:
+                                                initExpArg = Expression.Convert(initExpArg, typeof(bool));
+                                                break;
+                                        }
                                         break;
                                 }
                             var csname = newExp.Members != null ? newExp.Members[a].Name : (initExpArg as MemberExpression)?.Member.Name;
@@ -1103,7 +1136,7 @@ namespace FreeSql.Internal
                         return conditionalSql;
                     }
                 case ExpressionType.Call:
-                    tsc.mapType = null;
+                    if (!tsc.isNotSetMapColumnTmp) tsc.mapType = null;
                     var exp3 = exp as MethodCallExpression;
                     if (exp3.IsExpressionCall())
                     {

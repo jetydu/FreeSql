@@ -22,7 +22,7 @@ namespace FreeSql.Internal.CommonProvider
     {
         public Select1Provider(IFreeSql orm, CommonUtils commonUtils, CommonExpression commonExpression, object dywhere) : base(orm, commonUtils, commonExpression, dywhere)
         {
-            _whereGlobalFilter = _orm.GlobalFilter.GetFilters();
+            _whereGlobalFilter = _orm.GlobalFilter.GetFilters().Where(l => (l.FilterType & GlobalFilter.FilterType.Query) == GlobalFilter.FilterType.Query).ToList();
         }
 
         protected ISelect<T1> InternalFrom(LambdaExpression lambdaExp)
@@ -763,7 +763,6 @@ namespace FreeSql.Internal.CommonProvider
             }
         }
 
-        bool _isIncluded = false;
         public ISelect<T1> IncludeIf<TNavigate>(bool condition, Expression<Func<T1, TNavigate>> navigateSelector) where TNavigate : class => condition ? Include(navigateSelector) : this;
         public ISelect<T1> Include<TNavigate>(Expression<Func<T1, TNavigate>> navigateSelector) where TNavigate : class
         {
@@ -1811,6 +1810,12 @@ namespace FreeSql.Internal.CommonProvider
             _tables[0].Parameter = select.Parameters[0];
             return this.InternalToDataTableAsync(select?.Body, cancellationToken);
         }
+        async public Task ToChunkAsync<TReturn>(Expression<Func<T1, TReturn>> select, int size, Func<FetchCallbackArgs<List<TReturn>>, Task> done, CancellationToken cancellationToken = default)
+        {
+            if (select == null || done == null) return;
+            _tables[0].Parameter = select.Parameters[0];
+            await this.InternalToChunkAsync<TReturn>(select.Body, size, done, cancellationToken);
+        }
         public Task<TReturn> ToAggregateAsync<TReturn>(Expression<Func<ISelectGroupingAggregate<T1>, TReturn>> select, CancellationToken cancellationToken = default)
         {
             if (select == null) return Task.FromResult(default(TReturn));
@@ -1830,6 +1835,14 @@ namespace FreeSql.Internal.CommonProvider
         public Task<TReturn> FirstAsync<TReturn>(Expression<Func<T1, TReturn>> select, CancellationToken cancellationToken = default) => this.ToOneAsync(select, cancellationToken);
         public Task<TDto> FirstAsync<TDto>(CancellationToken cancellationToken = default) => this.ToOneAsync<TDto>(cancellationToken);
         public override Task<List<T1>> ToListAsync(bool includeNestedMembers, CancellationToken cancellationToken = default) => base.ToListAsync(_isIncluded || includeNestedMembers, cancellationToken);
+#endif
+
+#if ns21
+        public IAsyncEnumerable<List<TReturn>> ToChunkAsyncEnumerable<TReturn>(Expression<Func<T1, TReturn>> select, int size)
+        {
+            if (select != null) _tables[0].Parameter = select.Parameters[0];
+            return this.InternalToChunkAsyncEnumerable<TReturn>(select?.Body, size);
+        }
 #endif
     }
 }

@@ -33,7 +33,25 @@ namespace FreeSql.KingbaseES
                     {
                         switch (exp.Type.NullableTypeOrThis().ToString())
                         {
-                            case "System.Boolean": return $"(({getExp(operandExp)})::varchar not in ('0','false','f','no'))";
+                            case "System.Boolean":
+                                var boolstr = getExp(operandExp);
+                                switch (boolstr)
+                                {
+                                    case "0":
+                                    case "'0'":
+                                    case "false":
+                                    case "'f'":
+                                    case "'no'":
+                                        return "'f'::bool";
+                                    case "1":
+                                    case "'1'":
+                                    case "true":
+                                    case "'t'":
+                                    case "'yes'":
+                                        return "'t'::bool";
+                                    default:
+                                        return $"(({boolstr})::varchar not in ('0','false','f','no'))";
+                                }
                             case "System.Byte": return $"({getExp(operandExp)})::int2";
                             case "System.Char": return $"substr(({getExp(operandExp)})::char, 1, 1)";
                             case "System.DateTime": return ExpressionConstDateTime(operandExp) ?? $"({getExp(operandExp)})::timestamp";
@@ -61,7 +79,25 @@ namespace FreeSql.KingbaseES
                         case "TryParse":
                             switch (callExp.Method.DeclaringType.NullableTypeOrThis().ToString())
                             {
-                                case "System.Boolean": return $"(({getExp(callExp.Arguments[0])})::varchar not in ('0','false','f','no'))";
+                                case "System.Boolean":
+                                    var boolstr = getExp(callExp.Arguments[0]);
+                                    switch (boolstr)
+                                    {
+                                        case "0":
+                                        case "'0'":
+                                        case "false":
+                                        case "'f'":
+                                        case "'no'":
+                                            return "'f'::bool";
+                                        case "1":
+                                        case "'1'":
+                                        case "true":
+                                        case "'t'":
+                                        case "'yes'":
+                                            return "'t'::bool";
+                                        default:
+                                            return $"(({boolstr})::varchar not in ('0','false','f','no'))";
+                                    }
                                 case "System.Byte": return $"({getExp(callExp.Arguments[0])})::int2";
                                 case "System.Char": return $"substr(({getExp(callExp.Arguments[0])})::char, 1, 1)";
                                 case "System.DateTime": return ExpressionConstDateTime(callExp.Arguments[0]) ?? $"({getExp(callExp.Arguments[0])})::timestamp";
@@ -112,7 +148,10 @@ namespace FreeSql.KingbaseES
                     if (objType?.FullName == "System.Byte[]") return null;
 
                     var argIndex = 0;
-                    if (objType == null && callExp.Method.DeclaringType == typeof(Enumerable))
+                    if (objType == null && (
+                        callExp.Method.DeclaringType == typeof(Enumerable) ||
+                        callExp.Method.DeclaringType.FullName == "System.MemoryExtensions"
+                        ))
                     {
                         objExp = callExp.Arguments.FirstOrDefault();
                         objType = objExp?.Type;
@@ -408,7 +447,7 @@ namespace FreeSql.KingbaseES
                         var leftLike = exp.Object.NodeType == ExpressionType.MemberAccess ? left : $"({left})";
                         var args0Value = getExp(exp.Arguments[0]);
                         if (args0Value == "NULL") return $"{leftLike} IS NULL";
-                        if (args0Value.Contains("%"))
+                        if (new[] { '%', '_', '[', ']', '*' }.Any(wildcard => args0Value.Contains(wildcard)))
                         {
                             if (exp.Method.Name == "StartsWith") return $"strpos({left}, {args0Value}) = 1";
                             if (exp.Method.Name == "EndsWith") return $"strpos({left}, {args0Value}) = char_length({left})-char_length({args0Value})+1";
@@ -617,7 +656,25 @@ namespace FreeSql.KingbaseES
             {
                 switch (exp.Method.Name)
                 {
-                    case "ToBoolean": return $"(({getExp(exp.Arguments[0])})::varchar not in ('0','false','f','no'))";
+                    case "ToBoolean":
+                        var boolstr = getExp(exp.Arguments[0]);
+                        switch (boolstr)
+                        {
+                            case "0":
+                            case "'0'":
+                            case "false":
+                            case "'f'":
+                            case "'no'":
+                                return "'f'::bool";
+                            case "1":
+                            case "'1'":
+                            case "true":
+                            case "'t'":
+                            case "'yes'":
+                                return "'t'::bool";
+                            default:
+                                return $"(({boolstr})::varchar not in ('0','false','f','no'))";
+                        }
                     case "ToByte": return $"({getExp(exp.Arguments[0])})::int2";
                     case "ToChar": return $"substr(({getExp(exp.Arguments[0])})::char, 1, 1)";
                     case "ToDateTime": return ExpressionConstDateTime(exp.Arguments[0]) ?? $"({getExp(exp.Arguments[0])})::timestamp";

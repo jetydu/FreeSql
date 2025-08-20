@@ -583,6 +583,16 @@
             最大长度
             </summary>
         </member>
+        <member name="P:FreeSql.DatabaseModel.DbColumnInfo.Precision">
+            <summary>
+            暂支持 SqlServer/MySql（其他数据库待补充）
+            </summary>
+        </member>
+        <member name="P:FreeSql.DatabaseModel.DbColumnInfo.Scale">
+            <summary>
+            暂支持 SqlServer/MySql（其他数据库待补充）
+            </summary>
+        </member>
         <member name="P:FreeSql.DatabaseModel.DbColumnInfo.IsPrimary">
             <summary>
             主键
@@ -1087,6 +1097,93 @@
             </summary>
             <returns></returns>
         </member>
+        <member name="T:FreeSql.Extensions.DynamicEntity.DynamicCompileBuilder">
+            <summary>
+            动态创建实体类型
+            </summary>
+        </member>
+        <member name="M:FreeSql.Extensions.DynamicEntity.DynamicCompileBuilder.#ctor(IFreeSql,System.String,System.Attribute[])">
+            <summary>
+            配置Class
+            </summary>
+            <param name="className">类名</param>
+            <param name="attributes">类标记的特性[Table(Name = "xxx")] [Index(xxxx)]</param>
+            <returns></returns>
+        </member>
+        <member name="P:FreeSql.Extensions.DynamicEntity.DynamicCompileBuilder.TypeBuilder">
+            <summary>
+            获取类型构建器，可作为要构建的Type来引用
+            </summary>
+        </member>
+        <member name="M:FreeSql.Extensions.DynamicEntity.DynamicCompileBuilder.Property(System.String,System.Type,System.Attribute[])">
+            <summary>
+            配置属性
+            </summary>
+            <param name="propertyName">属性名称</param>
+            <param name="propertyType">属性类型</param>
+            <param name="attributes">属性标记的特性-支持多个</param>
+            <returns></returns>
+        </member>
+        <member name="M:FreeSql.Extensions.DynamicEntity.DynamicCompileBuilder.Property(System.String,System.Type,System.Boolean,System.Attribute[])">
+            <summary>
+            配置属性
+            </summary>
+            <param name="propertyName">属性名称</param>
+            <param name="propertyType">属性类型</param>
+            <param name="isOverride">该属性是否重写父类属性</param>
+            <param name="attributes">属性标记的特性-支持多个</param>
+            <returns></returns>
+        </member>
+        <member name="M:FreeSql.Extensions.DynamicEntity.DynamicCompileBuilder.Property(System.String,System.Type,System.Boolean,System.Object,System.Attribute[])">
+            <summary>
+            配置属性
+            </summary>
+            <param name="propertyName">属性名称</param>
+            <param name="propertyType">属性类型</param>
+            <param name="isOverride">该属性是否重写父类属性</param>
+            <param name="defaultValue">属性默认值</param>
+            <param name="attributes">属性标记的特性-支持多个</param>
+            <returns></returns>
+        </member>
+        <member name="M:FreeSql.Extensions.DynamicEntity.DynamicCompileBuilder.Extend(System.Type)">
+            <summary>
+            配置父类
+            </summary>
+            <param name="superClass">父类类型</param>
+            <returns></returns>
+        </member>
+        <member name="M:FreeSql.Extensions.DynamicEntity.DynamicCompileBuilder.OverrideProperty(System.Reflection.Emit.TypeBuilder@,System.Reflection.Emit.MethodBuilder,FreeSql.Extensions.DynamicEntity.DynamicCompileBuilder.PropertyMethodEnum,System.String)">
+            <summary>
+            Override属性
+            </summary>
+            <param name="typeBuilder"></param>
+        </member>
+        <member name="M:FreeSql.Extensions.DynamicEntity.DynamicCompileBuilder.Build">
+            <summary>
+            Emit动态创建出Class - Type
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:FreeSql.Extensions.DynamicEntity.DynamicCompileBuilder.BuildJustType">
+            <summary>
+            Emit动态创建出Class - Type，不附带获取TableInfo
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:FreeSql.Extensions.DynamicEntity.DynamicCompileBuilder.FirstCharToLower(System.String)">
+            <summary>
+            首字母小写
+            </summary>
+            <param name="input"></param>
+            <returns></returns>
+        </member>
+        <member name="M:FreeSql.Extensions.DynamicEntity.DynamicCompileBuilder.FirstCharToUpper(System.String)">
+            <summary>
+            首字母大写
+            </summary>
+            <param name="input"></param>
+            <returns></returns>
+        </member>
         <member name="M:FreeSql.Extensions.EntityUtil.EntityUtilExtensions.GetEntityKeyString(IFreeSql,System.Type,System.Object,System.Boolean,System.String)">
             <summary>
             获取实体的主键值，以 "*|_,[,_|*" 分割，当任意一个主键属性无值时，返回 ""
@@ -1271,6 +1368,12 @@
         <member name="M:FreeSql.SqlExt.DenseRank">
             <summary>
             dense_rank() over(order by ...)
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:FreeSql.SqlExt.Ntile(System.Int32)">
+            <summary>
+             ntile(5) over (order by ...)
             </summary>
             <returns></returns>
         </member>
@@ -1701,6 +1804,13 @@
             </summary>
             <returns></returns>
         </member>
+        <member name="M:FreeSql.IDelete`1.ExecuteDeletedAsync(System.Threading.CancellationToken)">
+            <summary>
+            执行SQL语句，返回被删除的记录<para></para>
+            注意：此方法只有 Postgresql/SqlServer/Maridb/Firebird/人大金仓 有效果
+            </summary>
+            <returns></returns>
+        </member>
         <member name="M:FreeSql.IInsert`1.WithTransaction(System.Data.Common.DbTransaction)">
             <summary>
             指定事务对象
@@ -1858,7 +1968,7 @@
         <member name="M:FreeSql.IInsert`1.ExecuteInserted">
             <summary>
             执行SQL语句，返回插入后的记录<para></para>
-            注意：此方法只有 Postgresql/SqlServer/MySql8.0.30+/Maridb/Firebird/DuckDB/人大金仓 有效果
+            注意：此方法只有 Postgresql/SqlServer/Maridb/Firebird/DuckDB/人大金仓 有效果
             </summary>
             <returns></returns>
         </member>
@@ -1874,7 +1984,7 @@
         <member name="M:FreeSql.IInsert`1.ExecuteInsertedAsync(System.Threading.CancellationToken)">
             <summary>
             执行SQL语句，返回插入后的记录<para></para>
-            注意：此方法只有 Postgresql/SqlServer/MySql8.0.30+/Maridb/Firebird/DuckDB/人大金仓 有效果
+            注意：此方法只有 Postgresql/SqlServer/Maridb/Firebird/DuckDB/人大金仓 有效果
             </summary>
             <returns></returns>
         </member>
@@ -2115,13 +2225,12 @@
             <param name="includeNestedMembers">false: 返回 2级 LeftJoin/InnerJoin/RightJoin 对象；true: 返回所有 LeftJoin/InnerJoin/RightJoin 的导航数据</param>
             <returns></returns>
         </member>
-        <member name="M:FreeSql.ISelect0`2.ToChunk(System.Int32,System.Action{FreeSql.Internal.Model.FetchCallbackArgs{System.Collections.Generic.List{`1}}},System.Boolean)">
+        <member name="M:FreeSql.ISelect0`2.ToChunk(System.Int32,System.Action{FreeSql.Internal.Model.FetchCallbackArgs{System.Collections.Generic.List{`1}}})">
             <summary>
             执行SQL查询，分块返回数据，可减少内存开销。比如读取10万条数据，每次返回100条处理。
             </summary>
             <param name="size">数据块的大小</param>
             <param name="done">处理数据块</param>
-            <param name="includeNestedMembers">false: 返回 2级 LeftJoin/InnerJoin/RightJoin 对象；true: 返回所有 LeftJoin/InnerJoin/RightJoin 的导航数据</param>
         </member>
         <member name="M:FreeSql.ISelect0`2.ToList``1(System.String)">
             <summary>
@@ -2340,7 +2449,7 @@
             <param name="name">零个或多个过滤器名字</param>
             <returns></returns>
         </member>
-        <member name="M:FreeSql.ISelect0`2.ForUpdate(System.Boolean)">
+        <member name="M:FreeSql.ISelect0`2.ForUpdate(System.Boolean,System.Boolean)">
             <summary>
             排他更新锁<para></para>
             注意：务必在开启事务后使用该功能<para></para>
@@ -2354,6 +2463,7 @@
             神通: for update
             </summary>
             <param name="nowait">noawait</param>
+            <param name="skipLocked">skip locked</param>
             <returns></returns>
         </member>
         <member name="M:FreeSql.ISelect0`2.GroupBy(System.String,System.Object)">
@@ -3357,7 +3467,7 @@
         <member name="M:FreeSql.IUpdate`1.ExecuteUpdatedAsync(System.Threading.CancellationToken)">
             <summary>
             执行SQL语句，返回更新后的记录<para></para>
-            注意：此方法只有 Postgresql/SqlServer 有效果
+            注意：此方法只有 Postgresql/SqlServer/Maridb/Firebird/人大金仓 有效果
             </summary>
             <returns></returns>
         </member>
@@ -4321,7 +4431,7 @@
             <summary>
             获取指定数据库的表信息，包括表、列详情、主键、唯一键、索引、外键、备注
             </summary>
-            <param name="database"></param>
+            <param name="database">可选-默认查询当前数据库</param>
             <returns></returns>
         </member>
         <member name="M:FreeSql.IDbFirst.GetTableByName(System.String,System.Boolean)">
@@ -5380,6 +5490,11 @@
             【ManyToMany】导航属性 {trytbTypeName}.{pnvName} 解析错误，中间类 {tbmidCsName}.{midTypePropsTrytbName} 导航属性不是【ManyToOne】或【OneToOne】
             </summary>
         </member>
+        <member name="M:FreeSql.CoreErrorStrings.ManyToMany_ParsingError_InconsistentClass_PrimaryKeyError(System.Object,System.Object,System.Object,FreeSql.Internal.Model.ColumnInfo[])">
+            <summary>
+            导航属性 {trytbTypeName}.{pnvName} 解析错误，中间类主键错误：{tbmidCsName}({string.Join(",", tbmidPrimarys.Select(a => a.CsName))}) 与两边不匹配
+            </summary>
+        </member>
         <member name="M:FreeSql.CoreErrorStrings.Mapping_Exception_HasNo_SamePropertyName(System.Object)">
             <summary>
             映射异常：{name} 没有一个属性名相同
@@ -5875,6 +5990,28 @@
             对象池
             </summary>
         </member>
+        <member name="M:FreeSqlGlobalDynamicEntityExtensions.DynamicEntity(FreeSql.ICodeFirst,System.String,System.Attribute[])">
+            <summary>
+            动态构建Class Type
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:FreeSqlGlobalDynamicEntityExtensions.CreateInstance(FreeSql.Internal.Model.TableInfo,System.Collections.Generic.Dictionary{System.String,System.Object})">
+            <summary>
+            根据字典，创建 table 对应的实体对象
+            </summary>
+            <param name="table"></param>
+            <param name="dict"></param>
+            <returns></returns>
+        </member>
+        <member name="M:FreeSqlGlobalDynamicEntityExtensions.CreateDictionary(FreeSql.Internal.Model.TableInfo,System.Object)">
+            <summary>
+            根据实体对象，创建 table 对应的字典
+            </summary>
+            <param name="table"></param>
+            <param name="instance"></param>
+            <returns></returns>
+        </member>
         <member name="M:FreeSqlGlobalExpressionCallExtensions.Between(System.DateTime,System.DateTime,System.DateTime)">
             <summary>
             C#： that >= between &amp;&amp; that &lt;= and<para></para>
@@ -5955,6 +6092,21 @@
             多表查询
             </summary>
             <returns></returns>
+        </member>
+        <member name="M:FreeSqlGlobalExtensions.Clone``1(FreeSql.ISelect{``0})">
+            <summary>
+            克隆 ISelect
+            </summary>
+        </member>
+        <member name="M:FreeSqlGlobalExtensions.Clone``2(FreeSql.ISelect{``0,``1})">
+            <summary>
+            克隆 ISelect
+            </summary>
+        </member>
+        <member name="M:FreeSqlGlobalExtensions.Clone``3(FreeSql.ISelect{``0,``1,``2})">
+            <summary>
+            克隆 ISelect
+            </summary>
         </member>
         <member name="M:FreeSqlGlobalExtensions.IncludeMany``2(System.Collections.Generic.List{``0},IFreeSql,System.Linq.Expressions.Expression{System.Func{``0,System.Collections.Generic.IEnumerable{``1}}},System.Action{FreeSql.ISelect{``1}})">
             <summary>

@@ -150,7 +150,7 @@ use [{olddatabase}];
                 tbname = _commonUtils.SplitTableName(tablename);
                 if (tbname?.Length == 1) tbname = new[] { olddatabase, "dbo", tbname[0] };
                 if (tbname?.Length == 2) tbname = new[] { olddatabase, tbname[0], tbname[1] };
-                tbname = tbname.Select(a => a.ToLower()).ToArray();
+                if (ignoreCase) tbname = tbname.Select(a => a.ToLower()).ToArray();
                 dbs = new[] { tbname[0] };
             }
             var tables = new List<DbTableInfo>();
@@ -290,6 +290,8 @@ where {1}
 ,a.is_identity 'isidentity'
 ,f.text as 'defaultvalue'
 ,a.column_id as 'position'
+,a.precision
+,a.scale
 from sys.columns", loc8.ToString().Replace("a.table_name", "a.object_id"), @"
 left join syscomments f on f.id = a.default_object_id
 ");
@@ -303,6 +305,8 @@ left join syscomments f on f.id = a.default_object_id
 ,a.is_output 'isidentity'
 ,'' as 'defaultvalue'
 ,1 as 'position'
+,a.precision
+,a.scale
 from sys.parameters", loc88.ToString().Replace("a.table_name", "a.object_id"), "");
                 }
                 sql = $"use [{db}];{sql};use [{olddatabase}]; ";
@@ -323,6 +327,8 @@ from sys.parameters", loc88.ToString().Replace("a.table_name", "a.object_id"), "
                     var defaultValue = string.Concat(row[9]);
                     var position = int.Parse(string.Concat(row[10]));
                     if (max_length == 0) max_length = -1;
+                    int.TryParse(string.Concat(row[11]), out var numeric_precision);
+                    int.TryParse(string.Concat(row[12]), out var numeric_scale);
 
                     loc3[object_id].Add(column, new DbColumnInfo
                     {
@@ -336,7 +342,9 @@ from sys.parameters", loc88.ToString().Replace("a.table_name", "a.object_id"), "
                         Table = loc2[object_id],
                         Comment = comment,
                         DefaultValue = defaultValue,
-                        Position = position
+                        Position = position,
+                        Precision = numeric_precision,
+                        Scale = numeric_scale,
                     });
                     loc3[object_id][column].DbType = this.GetDbType(loc3[object_id][column]);
                     loc3[object_id][column].CsType = this.GetCsTypeInfo(loc3[object_id][column]);
@@ -383,14 +391,14 @@ use [{olddatabase}];
                     if (!indexColumns.TryGetValue(object_id, out loc10))
                         indexColumns.Add(object_id, loc10 = new Dictionary<string, DbIndexInfo>());
                     if (!loc10.TryGetValue(index_id, out loc11))
-                        loc10.Add(index_id, loc11 = new DbIndexInfo());
+                        loc10.Add(index_id, loc11 = new DbIndexInfo { Name = index_id });
                     loc11.Columns.Add(new DbIndexColumnInfo { Column = loc9, IsDesc = is_desc });
                     if (is_unique && !is_primary_key)
                     {
                         if (!uniqueColumns.TryGetValue(object_id, out loc10))
                             uniqueColumns.Add(object_id, loc10 = new Dictionary<string, DbIndexInfo>());
                         if (!loc10.TryGetValue(index_id, out loc11))
-                            loc10.Add(index_id, loc11 = new DbIndexInfo());
+                            loc10.Add(index_id, loc11 = new DbIndexInfo { Name = index_id });
                         loc11.Columns.Add(new DbIndexColumnInfo { Column = loc9, IsDesc = is_desc });
                     }
                 }

@@ -108,7 +108,10 @@ namespace FreeSql.Custom.MySql
                     if (objType?.FullName == "System.Byte[]") return null;
 
                     var argIndex = 0;
-                    if (objType == null && callExp.Method.DeclaringType == typeof(Enumerable))
+                    if (objType == null && (
+                        callExp.Method.DeclaringType == typeof(Enumerable) ||
+                        callExp.Method.DeclaringType.FullName == "System.MemoryExtensions"
+                        ))
                     {
                         objExp = callExp.Arguments.FirstOrDefault();
                         objType = objExp?.Type;
@@ -285,7 +288,7 @@ namespace FreeSql.Custom.MySql
                         var leftLike = exp.Object.NodeType == ExpressionType.MemberAccess ? left : $"({left})";
                         var args0Value = getExp(exp.Arguments[0]);
                         if (args0Value == "NULL") return $"{leftLike} IS NULL";
-                        if (args0Value.Contains("%"))
+                        if (new[] { '%', '_', '[', ']', '*' }.Any(wildcard => args0Value.Contains(wildcard)))
                         {
                             if (exp.Method.Name == "StartsWith") return $"locate({args0Value}, {left}) = 1";
                             if (exp.Method.Name == "EndsWith") return $"locate({args0Value}, {left}) = char_length({left})-char_length({args0Value})+1";
